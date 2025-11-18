@@ -3,7 +3,7 @@
 import { useState } from "react";
 import SelectBusiness from "./SelectBusiness";
 import SelectBrand from "./SelectBrand";
-import CreateStore from "./CreateStore";
+import CreateStore from "../CreateStore";
 
 export default function CustomerWizard({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState<number>(1);
@@ -20,7 +20,6 @@ export default function CustomerWizard({ onDone }: { onDone: () => void }) {
       {step === 1 && (
         <SelectBusiness
           onSelect={(b: any) => { setSelectedBusiness(b); setStep(2); }}
-          onCreateNew={() => setStep(1)} // can open modal or navigate to AddBusiness
         />
       )}
 

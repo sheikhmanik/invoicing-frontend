@@ -30,7 +30,7 @@ export default function AddBusiness() {
   };
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-100 p-4">
+    <div className="flex justify-center items-center bg-gray-100 p-4">
       <div className="w-full max-w-lg bg-white rounded-xl shadow-lg p-6">
         <h1 className="text-2xl font-bold mb-6 text-center">Add Business</h1>
 

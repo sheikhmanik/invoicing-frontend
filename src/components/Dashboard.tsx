@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import AddBusiness from "./AddBusiness";
-import AddBrand from "./AddBrand";
-import AddRestaurant from "./AddRestaurant";
+import AddBusiness from "./create-customer/AddBusiness";
+import AddBrand from "./create-customer/AddBrand";
+import AddRestaurant from "./create-customer/AddRestaurant";
 import Customers from "./Customers";
 import Pricing from "./Pricing";
 import AddProduct from "./AddProduct";
 import axios from "axios";
-import CustomerWizard from "./CustomerWizard";
+import CustomerWizard from "./create-customer/CustomerWizard";
 import PlanListing from "./PlanListing";
 
 export default function Dashboard() {

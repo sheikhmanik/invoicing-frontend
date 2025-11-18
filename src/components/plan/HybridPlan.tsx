@@ -28,7 +28,7 @@ export default function HybridPlanPage({ hybrid }: { hybrid: any[] }) {
               <p className="font-semibold">
                 Price <span className="text-sm font-light">(Fixed)</span>
               </p>
-              <p>₹ {plan.basePrice}</p>
+              <p>₹ {plan.fixedPrice}</p>
             </div>
             
             <div>
