@@ -20,9 +20,10 @@ interface MeteredUsage {
 
 export interface PricingPlan {
   id?: number;
-  planType: "fixed" | "metered";
+  planType: "fixed" | "metered" | "hybrid";
   planName: string;
-  description?: string;
+  description: string;
+  fixedPrice?: number | string | null;
   basePrice: number | string;
   creditsIncluded: number | string;
   validity: number;
@@ -49,6 +50,7 @@ export default function Pricing() {
     planType: "fixed",
     planName: "",
     description: "",
+    fixedPrice: "",
     basePrice: "",
     creditsIncluded: "",
     validity: 6,
@@ -137,21 +139,34 @@ export default function Pricing() {
   // save plan (create or update). Important: include planId when updating
   const handleSavePlan = async () => {
     if (!currentPlan) return alert("No plan to save");
-    if (!currentPlan.planName || !currentPlan.planName.trim()) return alert("Plan name required");
+    if (
+      !currentPlan.planName
+      || !currentPlan.planType
+      || !currentPlan.description.trim()
+      || !currentPlan.basePrice
+      || !currentPlan.validity
+      || !currentPlan.creditsIncluded
+    ) return alert("Plan name required");
 
     const payload: any = {
       planType: currentPlan.planType,
       planName: currentPlan.planName,
-      description: currentPlan.description ?? "",
-      basePrice: Number(currentPlan.basePrice) || 0,
-      creditsIncluded: Number(currentPlan.creditsIncluded) || 0,
-      validity: currentPlan.validity ?? 6,
+      description: currentPlan.description,
+      basePrice: Number(currentPlan.basePrice),
+      creditsIncluded: Number(currentPlan.creditsIncluded),
+      validity: currentPlan.validity,
       meteredUsages: currentPlan.meteredUsages.map(mu => ({
         productId: mu.productId,
         name: mu.product?.name,
         credits: Number(mu.credits) || 0
       }))
     };
+
+    if (currentPlan.planType === "hybrid") {
+      payload.fixedPrice = Number(currentPlan.fixedPrice) || 0;
+    }
+
+    console.log("Payload", payload);
 
     // if we're editing existing plan, include planId to update that plan
     if (!isCreatingNew && currentPlan.id) payload.planId = currentPlan.id;
@@ -217,6 +232,17 @@ export default function Pricing() {
       setAllProducts(res.data);
     })();
   }, []);
+
+  useEffect(() => {
+    if (!currentPlan) return;
+
+    if (currentPlan.planType !== "hybrid") {
+      setCurrentPlan((prev: any) => ({
+        ...prev!,
+        fixedPrice: ""
+      }))
+    }
+  }, [currentPlan?.planType]);
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -330,6 +356,14 @@ export default function Pricing() {
                   />
                   <span>Metered</span>
                 </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    checked={currentPlan.planType === "hybrid"}
+                    onChange={() => updateCurrent({ planType: "hybrid" })}
+                  />
+                  <span>Hybrid</span>
+                </label>
               </div>
             </div>
 
@@ -351,6 +385,18 @@ export default function Pricing() {
                 onChange={(e) => updateCurrent({ description: e.target.value })}
               />
             </div>
+
+            {currentPlan.planType === "hybrid" && (
+              <div>
+                <label className="block text-sm font-semibold">Price <span className="text-sm font-light">(Fixed)</span></label>
+                <input
+                  className="w-full border px-3 py-2 rounded mt-1"
+                  value={String(currentPlan.fixedPrice ?? "")}
+                  onChange={(e) => updateCurrent({ fixedPrice: e.target.value })}
+                  inputMode="numeric"
+                />
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-semibold">Validity (in months)</label>
