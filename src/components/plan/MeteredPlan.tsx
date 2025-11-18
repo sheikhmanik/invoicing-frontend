@@ -1,4 +1,5 @@
 export default function MeteredPlanPage({ metered }: { metered: any[] }) {
+  
   if (!metered || metered.length === 0) {
     return (
       <p className="text-gray-500 text-center">No metered plans found.</p>

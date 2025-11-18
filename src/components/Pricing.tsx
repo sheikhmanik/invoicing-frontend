@@ -1,6 +1,7 @@
 "use client";
 
 import axios from "axios";
+import { SquarePen } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface Product {
@@ -24,7 +25,7 @@ export interface PricingPlan {
   description?: string;
   basePrice: number | string;
   creditsIncluded: number | string;
-  validity?: number;
+  validity: number;
   meteredUsages: MeteredUsage[];
   createdAt?: string;
 }
@@ -32,7 +33,11 @@ export interface PricingPlan {
 const API = process.env.NEXT_PUBLIC_API_URL;
 
 export default function Pricing() {
+
   const [allPlans, setAllPlans] = useState<PricingPlan[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [onDisplayProducts, setOnDisplayProducts] = useState<boolean>(false);
+
   const [currentPlan, setCurrentPlan] = useState<PricingPlan | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [createProductModal, setCreateProductModal] = useState(false);
@@ -124,9 +129,8 @@ export default function Pricing() {
       setNewProductCredit("");
       // optionally reload product list if you maintain one
       alert("Product created and added to current plan view.");
-    } catch (err) {
-      console.error("Error create product", err);
-      alert("Failed to create product");
+    } catch (error: any) {
+      alert(error.response?.data?.error || "Failed to create product");
     }
   };
 
@@ -187,6 +191,32 @@ export default function Pricing() {
       return next;
     });
   };
+
+  const availableProducts = allProducts.filter(
+    p => !currentPlan?.meteredUsages.some(mu => mu.productId === p.id)
+  );
+
+  const attachProductToPlan = (product: Product) => {
+    setCurrentPlan(prev => ({
+      ...prev!,
+      meteredUsages: [
+        ...prev!.meteredUsages,
+        {
+          productId: product.id,
+          credits: 0,
+          product,
+          isActive: true
+        }
+      ]
+    }));
+  };
+
+  useEffect(() => {
+    (async () => {
+      const res = await axios.get(`${API}/products`);
+      setAllProducts(res.data);
+    })();
+  }, []);
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -255,7 +285,17 @@ export default function Pricing() {
             <tbody>
               {allPlans.map((plan: any) => (
                 <tr key={plan.id} className="border-b hover:bg-gray-50">
-                  <td className="p-3 text-start">{plan.planName}</td>
+                  <td className="p-3 text-start">
+                    <div className="flex items-center gap-1">
+                      <a
+                        className="text-blue-700 cursor-pointer"
+                        onClick={() => onSelectPlan(plan.id)}
+                      >
+                        <SquarePen size={16} />
+                      </a>
+                      <p>{plan.planName}</p>
+                    </div>
+                  </td>
                   <td className="p-3 text-start capitalize">{plan.planType}</td>
                   <td className="p-3 text-start text-gray-600">{plan.description || "—"}</td>
                   <td className="p-3 text-start">₹ {plan.basePrice}</td>
@@ -312,6 +352,17 @@ export default function Pricing() {
               />
             </div>
 
+            <div>
+              <label className="block text-sm font-semibold">Validity (in months)</label>
+              <input
+                type="number"
+                className="w-full border px-3 py-2 rounded mt-1"
+                value={currentPlan.validity}
+                onChange={(e) => updateCurrent({ validity: Number(e.target.value) })}
+                placeholder="e.g. 6"
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold">Base Price</label>
@@ -345,12 +396,39 @@ export default function Pricing() {
               </button>
             </div>
 
+            <div className="flex items-end justify-end mb-4">
+              <button
+                className={`flex items-center justify-center p-2 text-sm rounded ${onDisplayProducts === true ? "bg-blue-700 text-white" : "bg-gray-200 text-black"} `}
+                onClick={() => setOnDisplayProducts(!onDisplayProducts)}
+              >Existing Products</button>
+            </div>
+
+            {onDisplayProducts && (
+              <div className="space-y-3 mb-4">
+                {availableProducts.length === 0 && (
+                  <p className="text-gray-500 text-sm">No products available</p>
+                )}
+                {availableProducts.map(prod => (
+                  <div
+                    key={prod.id}
+                    className="flex justify-between p-3 bg-gray-100 rounded cursor-pointer hover:bg-gray-200"
+                    onClick={() => attachProductToPlan(prod)}
+                  >
+                    <span className="font-medium">{prod.name}</span>
+                    <button className="px-2 py-1 bg-blue-600 text-white rounded text-xs">
+                      Add
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {currentPlan.meteredUsages.length === 0 && (
               <p className="text-sm text-gray-500">No metered usages yet.</p>
             )}
 
             <div className="space-y-3">
-              {currentPlan.meteredUsages.map((mu, idx) => (
+              {currentPlan?.meteredUsages?.map((mu, idx) => (
                 <div key={mu.productId + "-" + idx} className="flex items-center gap-4">
                   <div className="w-1/3">
                     <div className="text-sm font-medium">{mu.product?.name}</div>

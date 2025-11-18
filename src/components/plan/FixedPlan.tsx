@@ -1,4 +1,5 @@
 export default function FixedPlanPage({ fixed }: { fixed: any[] }) {
+  
   if (!fixed || fixed.length === 0) {
     return <p className="text-gray-500 text-center">No fixed plans found.</p>;
   }
