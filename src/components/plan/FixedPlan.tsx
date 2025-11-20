@@ -1,4 +1,6 @@
 export default function FixedPlanPage({ fixed }: { fixed: any[] }) {
+
+  console.log(fixed);
   
   if (!fixed || fixed.length === 0) {
     return <p className="text-gray-500 text-center">No fixed plans found.</p>;
@@ -51,7 +53,7 @@ export default function FixedPlanPage({ fixed }: { fixed: any[] }) {
             <p className="text-lg font-semibold mb-2">Metered Usage</p>
 
             <div className="space-y-3">
-              {plan.meteredUsages?.map((mu: any) => (
+              {plan.meteredProducts?.map((mu: any) => (
                 <div
                   key={mu.id}
                   className="flex items-center justify-between bg-gray-100 border rounded p-3"

@@ -57,10 +57,27 @@ export default function HybridPlanPage({ hybrid }: { hybrid: any[] }) {
 
           {/* METERED USAGE LIST */}
           <div>
-            <p className="text-lg font-semibold mb-2">Metered Usage</p>
+            <p className="text-lg font-semibold mb-2">Included Products</p>
 
             <div className="space-y-3">
-              {plan.meteredUsages?.map((mu: any) => (
+              {plan.includedProducts?.map((mu: any) => (
+                <div
+                  key={mu.id}
+                  className="flex items-center justify-between bg-gray-100 border rounded p-3"
+                >
+                  <p className="font-semibold">{mu.product.name}</p>
+
+                  <p className="text-gray-800">Credits: {mu.credits}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <div>
+            <p className="text-lg font-semibold mb-2">Metered Products</p>
+
+            <div className="space-y-3">
+              {plan.meteredProducts?.map((mu: any) => (
                 <div
                   key={mu.id}
                   className="flex items-center justify-between bg-gray-100 border rounded p-3"
