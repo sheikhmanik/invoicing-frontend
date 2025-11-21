@@ -36,6 +36,8 @@ export default function SelectBrand({ business, onBack, onSelect }: any) {
         name: form.name,
       }]);
 
+      loadBrands(business.id);
+
       setShowAddBrand(false); // Close modal
       setForm({ name: "" });  // Reset
     } catch (err: any) {

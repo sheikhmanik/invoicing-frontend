@@ -48,6 +48,15 @@ export default function Customers() {
   const [planEditingModal, setPlanEditingModal] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState<null | Record<any, any>>(null);
   const [currentPlan, setCurrentPlan] = useState<PricingPlan>();
+  const [confirmAssigned, setConfirmAssigned] = useState(false);
+
+  const [startDate, setStartDate] = useState(() => {
+    const today = new Date().toISOString().split("T")[0];
+    return today;
+  });
+
+  const [planMode, setPlanMode] = useState<"trial" | "live">("live");
+  const [trialDays, setTrialDays] = useState<number>(15);
 
   const [taxSettings, setTaxSettings] = useState({
     CGST: false,
@@ -74,16 +83,31 @@ export default function Customers() {
   }
 
   async function handleAssignPlan(restaurantId: number, pricingPlanId: number) {
+    if (!startDate) return alert("Please include start date.");
+    if (!planMode) return alert("Please include plan mode.");
+    if (planMode === "trial" && !trialDays) return alert("Please include trial days.");
+    if (!confirmAssigned) {
+      alert("Please confirm. We can not go back. Edit this again.");
+      setConfirmAssigned(true);
+      return;
+    }
+    const payload = {
+      restaurantId,
+      pricingPlanId,
+      ...taxSettings,
+      startDate,
+      planMode,
+      trialDays,
+    }
     try {
-      await axios.post(`${API}/restaurant/plan-map`, {
-        restaurantId,
-        pricingPlanId,
-        ...taxSettings,
-      });
+      console.log(payload);
+      await axios.post(`${API}/restaurant/plan-map`, payload);
       alert("Plan assigned successfully");
       setPlanEditingModal(false);
     } catch (err) {
       console.error(err);
+    } finally {
+      setConfirmAssigned(false);
     }
   }
 
@@ -99,7 +123,6 @@ export default function Customers() {
       try {
         const res = await axios.get(`${API}/pricing-plan`);
         if (res.data) setAllPlans(res.data);
-        console.log(res.data);
       } catch {}
     })();
   }, []);
@@ -161,25 +184,66 @@ export default function Customers() {
                     </div>
                   </td>
 
-                  {/* SUBSCRIPTION TYPE (dummy) */}
-                  <td className="p-4 border-r text-center leading-5">
-                    <div className="font-medium">Start: 1-6-25</div>
-                    <div className="text-sm">Recurring: 3 months</div>
-                    <div className="text-sm text-gray-500">Metered / Usage</div>
+                  {/* SUBSCRIPTION TYPE */}
+                  <td className="p-4 border-r text-center leading-5 text-sm text-gray-700">
+                    {r.restaurantPricingPlans?.length > 0 && r.restaurantPricingPlans[0]?.pricingPlan ? (
+                      <div className="flex flex-col">
+                        <span className="font-medium">
+                          {r.restaurantPricingPlans[0].pricingPlan.planName}
+                        </span>
+                        <span className="text-xs text-gray-500 capitalize">
+                          {r.restaurantPricingPlans[0].pricingPlan.planType}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-gray-500">No plan assigned.</span>
+                    )}
                   </td>
 
-                  {/* PROFORMA (dummy) */}
-                  <td className="p-4 border-r text-center leading-5">
-                    <div className="font-medium">E/24/1/0001</div>
-                    <div className="text-gray-700">₹ 25,000</div>
+                  {/* PROFORMA */}
+                  <td className="p-4 border-r text-center text-xs space-y-3">
+
+                    {/* Due Date */}
+                    <div>
+                      <p className="text-gray-500">Due Date</p>
+                      <p className="font-semibold">
+                        {r.invoices?.[r.invoices.length - 1]?.dueDate?.split("T")[0] ?? "--"}
+                      </p>
+                    </div>
+
+                    {/* Total Amount */}
+                    <div>
+                      <p className="text-gray-500">Total Amount</p>
+                      <p className="font-semibold">
+                        ₹{r.invoices?.[r.invoices.length - 1]?.totalAmount ?? "--"}
+                      </p>
+                    </div>
+
+                    {/* Status */}
+                    <div>
+                      <p className="text-gray-500">Status</p>
+                      <p
+                        className={`font-semibold capitalize ${
+                          r.invoices?.[r.invoices.length - 1]?.status === "paid"
+                            ? "text-green-600"
+                            : r.invoices?.[r.invoices.length - 1]?.status === "overdue"
+                            ? "text-red-600"
+                            : "text-yellow-600"
+                        }`}
+                      >
+                        {r.invoices?.[r.invoices.length - 1]?.status ?? "--"}
+                      </p>
+                    </div>
+
                   </td>
 
-                  {/* PENDING (dummy) */}
+                  {/* PENDING */}
                   <td className="p-4 border-r text-center leading-5">
-                    <div className="text-red-600 font-semibold">₹ 15,000</div>
-                    <button className="text-blue-600 text-xs underline hover:text-blue-800">
-                      Create Invoice
-                    </button>
+                    <div className="text-red-600 font-semibold">
+                      {r.invoices?.[r.invoices.length - 1]?.status === "pending" && (
+                        <p>${r.invoices?.[r.invoices.length - 1]?.totalAmount}</p>
+                      )}
+                    </div>
                   </td>
 
                   {/* PAID (dummy) */}
@@ -313,9 +377,172 @@ export default function Customers() {
                     )}
                   </div>
 
+                  {currentPlan.planType === "hybrid" && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-800 mt-2">Included Products</h3>
+
+                      {currentPlan.includedProducts?.length === 0 || !currentPlan.includedProducts ? (
+                        <p className="text-gray-500 text-sm">No included products found.</p>
+                      ) : (
+                        <div className="space-y-3 mt-2">
+                          {currentPlan.includedProducts?.map((prod, idx) => (
+                            <div
+                              key={prod.productId + "-included-" + idx}
+                              className="p-3 bg-white border rounded-lg shadow-sm flex justify-between"
+                            >
+                              <div className="text-sm font-medium text-gray-800">
+                                {prod.product?.name}
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                Credits:{" "}
+                                <span className="font-semibold">{prod.credits}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-800 mt-2">Metered Products</h3>
+
+                    {(currentPlan.meteredProducts?.length === 0 || !currentPlan.meteredProducts) ? (
+                      <p className="text-gray-500 text-sm">No metered products found.</p>
+                    ) : (
+                      <div className="space-y-3 mt-2">
+                        {currentPlan.meteredProducts?.map((prod, idx) => (
+                          <div
+                            key={prod.productId + "-metered-" + idx}
+                            className="p-3 bg-white border rounded-lg shadow-sm flex justify-between"
+                          >
+                            <div className="text-sm font-medium text-gray-800">
+                              {prod.product?.name}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              Credits:{" "}
+                              <span className="font-semibold">{prod.credits}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                 </div>
               )}
 
+            </div>
+
+            <div className="border rounded-lg p-2 bg-gray-50">
+              {/* TAX SETTINGS SECTION */}
+              <div className="bg-gray-100 p-4 rounded space-y-3">
+                <h3 className="text-md font-semibold text-gray-800">GST Settings</h3>
+
+                <div className="flex flex-col gap-2 text-sm">
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4"
+                      checked={taxSettings.CGST}
+                      onChange={(e) => setTaxSettings(prev => ({ ...prev, CGST: e.target.checked }))}
+                    />
+                    <span>CGST 9%</span>
+                  </label>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4"
+                      checked={taxSettings.SGST}
+                      onChange={(e) => setTaxSettings(prev => ({ ...prev, SGST: e.target.checked }))}
+                    />
+                    <span>SGST 9%</span>
+                  </label>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4"
+                      checked={taxSettings.IGST}
+                      onChange={(e) => setTaxSettings(prev => ({ ...prev, IGST: e.target.checked }))}
+                    />
+                    <span>IGST 18%</span>
+                  </label>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4"
+                      checked={taxSettings.LUT}
+                      onChange={(e) => setTaxSettings(prev => ({ ...prev, LUT: e.target.checked }))}
+                    />
+                    <span>Add LUT</span>
+                  </label>
+
+                </div>
+              </div>
+
+              {/* TIME TABLE */}
+              <div className="bg-gray-100 p-4 rounded space-y-4 mt-2">
+                <h3 className="text-md font-semibold text-gray-800">Time Structure</h3>
+
+                {/* Start Date */}
+                <div className="flex flex-col gap-1 text-sm">
+                  <label className="font-medium">Start Date:</label>
+                  <input
+                    type="date"
+                    className="border p-2 rounded"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+
+                {/* Plan Mode */}
+                <div className="flex flex-col gap-2 text-sm">
+                  <label className="font-medium">Plan Mode:</label>
+
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="planMode"
+                        value="live"
+                        checked={planMode === "live"}
+                        onChange={() => setPlanMode("live")}
+                      />
+                      <span>Live</span>
+                    </label>
+
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="planMode"
+                        value="trial"
+                        checked={planMode === "trial"}
+                        onChange={() => setPlanMode("trial")}
+                      />
+                      <span>Trial</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Trial Days (conditional) */}
+                {planMode === "trial" && (
+                  <div className="flex flex-col gap-1 text-sm">
+                    <label className="font-medium">Trial Duration (Days):</label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="border p-2 rounded"
+                      value={trialDays}
+                      onChange={(e) => setTrialDays(Number(e.target.value))}
+                      placeholder="Enter number of days"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* PLAN GRID */}
@@ -358,57 +585,6 @@ export default function Customers() {
                     </div>
                   </div>
 
-                  {/* TAX SETTINGS SECTION */}
-                  {plan.id === currentPlan?.id && (
-                    <div className="border rounded-lg p-4 bg-gray-50 space-y-3 mt-2">
-                      <h3 className="text-md font-semibold text-gray-800">GST Settings</h3>
-
-                      <div className="flex flex-col gap-2 text-sm">
-
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4"
-                            checked={taxSettings.CGST}
-                            onChange={(e) => setTaxSettings(prev => ({ ...prev, CGST: e.target.checked }))}
-                          />
-                          <span>CGST 9%</span>
-                        </label>
-
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4"
-                            checked={taxSettings.SGST}
-                            onChange={(e) => setTaxSettings(prev => ({ ...prev, SGST: e.target.checked }))}
-                          />
-                          <span>SGST 9%</span>
-                        </label>
-
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4"
-                            checked={taxSettings.IGST}
-                            onChange={(e) => setTaxSettings(prev => ({ ...prev, IGST: e.target.checked }))}
-                          />
-                          <span>IGST 18%</span>
-                        </label>
-
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4"
-                            checked={taxSettings.LUT}
-                            onChange={(e) => setTaxSettings(prev => ({ ...prev, LUT: e.target.checked }))}
-                          />
-                          <span>Add LUT</span>
-                        </label>
-
-                      </div>
-                    </div>
-                  )}
-
                   {/* ACTION BUTTONS */}
                   <div className="mt-4 flex gap-2">
                     <button
@@ -417,20 +593,12 @@ export default function Customers() {
                     >
                       Assign This Plan
                     </button>
-
-                    <button
-                      className="flex-1 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
-                      // onClick={() => handleOpenEditModal(plan)}
-                    >
-                      Edit
-                    </button>
                   </div>
                 </div>
               ))}
 
             </div>
 
-            {/* NO PLANS */}
             {allPlans.length === 0 && (
               <p className="text-center text-gray-500 py-6">No pricing plans available.</p>
             )}

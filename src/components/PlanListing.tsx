@@ -1,8 +1,8 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
-import FixedPlanPage from "./plan/FixedPlan";
-import MeteredPlanPage from "./plan/MeteredPlan";
-import HybridPlanPage from "./plan/HybridPlan";
+import FixedPlanPage from "./plan-listing/FixedPlan";
+import MeteredPlanPage from "./plan-listing/MeteredPlan";
+import HybridPlanPage from "./plan-listing/HybridPlan";
 
 export default function PlanListing() {
 
