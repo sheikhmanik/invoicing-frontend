@@ -1,6 +1,7 @@
 "use client";
 
 import axios from "axios";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 interface Product {
@@ -49,6 +50,7 @@ export default function Customers() {
   const [selectedRestaurant, setSelectedRestaurant] = useState<null | Record<any, any>>(null);
   const [currentPlan, setCurrentPlan] = useState<PricingPlan>();
   const [confirmAssigned, setConfirmAssigned] = useState(false);
+  const router = useRouter();
 
   const [startDate, setStartDate] = useState(() => {
     const today = new Date().toISOString().split("T")[0];
@@ -100,7 +102,6 @@ export default function Customers() {
       trialDays,
     }
     try {
-      console.log(payload);
       await axios.post(`${API}/restaurant/plan-map`, payload);
       alert("Plan assigned successfully");
       setPlanEditingModal(false);
@@ -114,7 +115,6 @@ export default function Customers() {
   useEffect(() => {
     axios.get(`${API}/restaurant`).then((res) => {
       setRestaurants(res.data);
-      console.log(res.data);
     });
   }, []);
 
@@ -201,7 +201,12 @@ export default function Customers() {
                   </td>
 
                   {/* PROFORMA */}
-                  <td className="p-4 border-r text-center text-xs space-y-3">
+                  <td
+                    className="p-4 border-r text-center text-xs space-y-3 cursor-pointer"
+                    onClick={() => {
+                      router.push(`/proforma-invoice/${r.id}`)
+                    }}
+                  >
 
                     {/* Due Date */}
                     <div>
