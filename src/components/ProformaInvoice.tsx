@@ -68,6 +68,7 @@ interface PricingPlan {
 interface RestaurantInvoice {
   invoiceNumber: string;
   totalAmount: number;
+  status: "pending" | "paid";
 }
 
 interface RestaurantBrand {
@@ -149,13 +150,15 @@ export default function ProformaInvoice() {
     >
 
       {/* Logo */}
-      <Image
-        alt="logo"
-        src="/fuvii.png"
-        width={70}
-        height={70}
-        className="mb-3"
-      />
+      <div className="flex items-center justify-end">
+        <Image
+          alt="logo"
+          src="/fuvii.png"
+          width={70}
+          height={70}
+          className="mb-2"
+        />
+      </div>
 
       {/* Header */}
       <div className="text-left mb-6 border-b-2 pb-2">
@@ -168,7 +171,7 @@ export default function ProformaInvoice() {
 
       {/* Title + Date */}
       <div className="flex justify-between mb-4 mt-10">
-        <h3 className="text-xl font-bold">Proforma Invoice</h3>
+        <h3 className="text-xl font-bold">{invoice.status === "pending" ? "Proforma Invoice" : invoice.status === "paid" ? "Tax Invoice" : ""}</h3>
         <p>Date: {new Date().toLocaleDateString("en-GB")}</p>
       </div>
 

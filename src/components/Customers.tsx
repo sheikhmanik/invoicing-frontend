@@ -44,13 +44,16 @@ const API = process.env.NEXT_PUBLIC_API_URL;
 
 export default function Customers() {
 
+  const router = useRouter();
+
   const [restaurants, setRestaurants] = useState([]);
   const [allPlans, setAllPlans] = useState<PricingPlan[]>([]);
   const [planEditingModal, setPlanEditingModal] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState<null | Record<any, any>>(null);
   const [currentPlan, setCurrentPlan] = useState<PricingPlan>();
   const [confirmAssigned, setConfirmAssigned] = useState(false);
-  const router = useRouter();
+  const [updatePayment, setUpdatePayment] = useState(false);
+  const [currentResId, serCurrentResId] = useState<number | null>(null);
 
   const [startDate, setStartDate] = useState(() => {
     const today = new Date().toISOString().split("T")[0];
@@ -112,9 +115,43 @@ export default function Customers() {
     }
   }
 
+  const [paymentDate, setPaymentDate] = useState("");
+  const [paymentNotes, setPaymentNotes] = useState("");
+  const [isPartial, setIsPartial] = useState("No"); // ⭐ Default is "No"
+
+  const [error, setError] = useState("");
+
+  const handleUpdatePayment = async () => {
+    if (!paymentDate) {
+      setError("Payment date is required!");
+      return;
+    }
+
+    setError("");
+
+    try {
+      const payload = {
+        currentResId,
+        paymentDate,
+        paymentNotes,
+        isPartial,
+      }
+      await axios.post(`${API}/restaurant/update-payment`, payload);
+
+      alert("Payment updated successfully!");
+      setUpdatePayment(false);
+      serCurrentResId(null);
+      window.location.reload(); // optional
+    } catch (err) {
+      console.error(err);
+      setError("Failed to update payment.");
+    }
+  };
+
   useEffect(() => {
     axios.get(`${API}/restaurant`).then((res) => {
       setRestaurants(res.data);
+      console.log(res.data);
     });
   }, []);
 
@@ -201,12 +238,7 @@ export default function Customers() {
                   </td>
 
                   {/* PROFORMA */}
-                  <td
-                    className="p-4 border-r text-center text-xs space-y-3 cursor-pointer"
-                    onClick={() => {
-                      router.push(`/proforma-invoice/${r.id}`)
-                    }}
-                  >
+                  <td className="p-4 border-r text-center text-xs space-y-3">
 
                     {/* Due Date */}
                     <div>
@@ -238,6 +270,24 @@ export default function Customers() {
                       >
                         {r.invoices?.[r.invoices.length - 1]?.status ?? "--"}
                       </p>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={() => router.push(`/proforma-invoice/${r.id}`)}
+                        className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                      >
+                        Invoice
+                      </button>
+                      <button
+                        onClick={() => {
+                          serCurrentResId(r.id)
+                          setUpdatePayment(true)
+                        }}
+                        className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                      >
+                        Update Payment
+                      </button>
                     </div>
 
                   </td>
@@ -608,6 +658,75 @@ export default function Customers() {
               <p className="text-center text-gray-500 py-6">No pricing plans available.</p>
             )}
 
+          </div>
+        </div>
+      )}
+      {updatePayment && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 space-y-6">
+            <div className="flex flex-col gap-6 w-full p-6 rounded-lg shadow-sm border border-gray-200">
+
+              {error && (
+                <p className="text-sm text-red-600 font-medium">{error}</p>
+              )}
+
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-gray-700">Payment Date</label>
+                <input
+                  type="date"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50 focus:bg-white
+                  focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-gray-700">Payment Notes</label>
+                <textarea
+                  rows={4}
+                  value={paymentNotes}
+                  onChange={(e) => setPaymentNotes(e.target.value)}
+                  placeholder="Add additional payment details..."
+                  className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50 focus:bg-white
+                  focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none resize-none transition-all"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-gray-700">Is Payment Partially Done?</label>
+                <select
+                  value={isPartial}
+                  onChange={(e) => setIsPartial(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50 focus:bg-white
+                  focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none cursor-pointer transition-all"
+                >
+                  <option value="No">No</option> {/* ⭐ Default */}
+                  <option value="Yes">Yes</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  className="px-4 py-2 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-100 transition-all"
+                  onClick={() => {
+                    setUpdatePayment(false);
+                    serCurrentResId(null);
+                  }}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  className="px-4 py-2 text-sm rounded-md bg-sky-600 text-white shadow
+                  hover:bg-sky-700 focus:ring-2 focus:ring-sky-400 transition-all"
+                  onClick={handleUpdatePayment}
+                >
+                  Update
+                </button>
+              </div>
+
+            </div>
           </div>
         </div>
       )}
