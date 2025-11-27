@@ -37,6 +37,18 @@ export default function Dashboard() {
     });
   }, []);
 
+  useEffect(() => {
+    const saved = localStorage.getItem("dashboardView");
+    if (saved) setDisplay(saved);
+  }, []);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("dashboardView");
+    if (!saved) {
+      localStorage.setItem("dashboardView", display);
+    }
+  }, [display]);
+
   return (
     <div className="min-h-screen bg-gray-50 text-slate-800">
       <div className="flex">
@@ -173,7 +185,7 @@ export default function Dashboard() {
           )}
           
           {display === "Customer" && (
-            <Customers/>
+            <Customers onDone={() => setDisplay("Customer")} />
           )}
           
           {display === "Plan Listing" && (

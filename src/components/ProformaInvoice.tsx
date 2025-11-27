@@ -67,6 +67,7 @@ interface PricingPlan {
 
 interface RestaurantInvoice {
   invoiceNumber: string;
+  subTotalAmount: number;
   totalAmount: number;
   status: "pending" | "paid";
 }
@@ -81,7 +82,12 @@ interface RestaurantBrand {
 interface Restaurant {
   name: string;
   invoices: RestaurantInvoice[];
-  restaurantPricingPlans: { pricingPlan: PricingPlan }[];
+  restaurantPricingPlans: { 
+    pricingPlan: PricingPlan,
+    cgst: boolean,
+    igst: boolean,
+    sgst: boolean,
+  }[];
   brand: RestaurantBrand;
 }
 
@@ -100,6 +106,7 @@ export default function ProformaInvoice() {
       .then((res) => {
         const item = res.data.find((i: any) => i.id === resId);
         setRestaurant(item || null);
+        console.log(item);
       })
       .catch((err) => console.error("Error fetching restaurant:", err))
       .finally(() => setLoading(false));
@@ -138,8 +145,9 @@ export default function ProformaInvoice() {
 
   const subscriptionPeriod = `${formatDate(createdDate)} — ${formatDate(endDate)}`;
 
-  const amount = Math.ceil(invoice.totalAmount);
-  const amountInWords = `${numberToWords(amount)} only`;
+  const subTotalAmount = Math.ceil(invoice.subTotalAmount);
+  const totalAmount = Math.ceil(invoice.totalAmount);
+  const amountInWords = `${numberToWords(totalAmount)} only`;
 
   return (
     <>
@@ -210,25 +218,42 @@ export default function ProformaInvoice() {
               {subscriptionPeriod}
             </td>
             <td className="border p-2 text-center">
-              ₹{amount}.00/-
+              ₹{subTotalAmount}.00/-
             </td>
             <td className="border p-2 text-center">
-              ₹{amount}.00/-
+              ₹{subTotalAmount}.00/-
             </td>
           </tr>
 
           <tr>
-            <td colSpan={3} className="border p-2 text-right font-semibold">
-              Subtotal
-            </td>
-            <td className="border p-2 text-center">₹{amount}.00/-</td>
+            <td colSpan={3} className="border p-2 text-right font-semibold">Subtotal</td>
+            <td className="border p-2 text-center">₹{subTotalAmount}.00/-</td>
           </tr>
+
+          {restaurant.restaurantPricingPlans[0].cgst && (
+            <tr>
+              <td colSpan={3} className="border p-2 text-right">CGST (9%)</td>
+              <td className="border p-2 text-center">₹{Number(subTotalAmount * 0.09)}.00/-</td>
+            </tr>
+          )}
+          {restaurant.restaurantPricingPlans[0].sgst && (
+            <tr>
+              <td colSpan={3} className="border p-2 text-right">SGST (9%)</td>
+              <td className="border p-2 text-center">₹{Number(subTotalAmount * 0.09)}.00/-</td>
+            </tr>
+          )}
+          {restaurant.restaurantPricingPlans[0].igst && (
+            <tr>
+              <td colSpan={3} className="border p-2 text-right">IGST (18%)</td>
+              <td className="border p-2 text-center">₹{Number(subTotalAmount * 0.18)}.00/-</td>
+            </tr>
+          )}
 
           <tr className="font-bold">
             <td colSpan={3} className="border p-2 text-right">
               Total — {amountInWords}
             </td>
-            <td className="border p-2 text-center">₹{amount}.00/-</td>
+            <td className="border p-2 text-center">₹{totalAmount}.00/-</td>
           </tr>
         </tbody>
       </table>

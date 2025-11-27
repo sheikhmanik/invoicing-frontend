@@ -36,7 +36,7 @@ export default function CustomerWizard({ onDone }: { onDone: () => void }) {
           business={selectedBusiness}
           brand={selectedBrand}
           onBack={() => setStep(2)}
-          onDone={() => { setStep(1); setSelectedBusiness(null); setSelectedBrand(null); }}
+          onDone={() => { setStep(1); setSelectedBusiness(null); setSelectedBrand(null); onDone() }}
         />
       )}
     </div>
