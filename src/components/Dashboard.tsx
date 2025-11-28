@@ -13,8 +13,17 @@ import PlanListing from "./PlanListing";
 
 export default function Dashboard() {
 
-  const [display, setDisplay] = useState<string>("Dashboard");
+  const [display, setDisplay] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("dashboardView");
+      if (saved) {
+        return saved;
+      }
+    }
+    return "Dashboard";
+  });
   const [stats, setStats] = useState<any>(null);
+  const [hydrated, setHydrated] = useState(false);
 
   const statsTop = [
     { title: "Total Customers", value: stats?.totalCustomers ?? "—" },
@@ -43,11 +52,18 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    const saved = localStorage.getItem("dashboardView");
-    if (!saved) {
+    if (typeof window !== "undefined") {
       localStorage.setItem("dashboardView", display);
     }
   }, [display]);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  if (!hydrated) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 text-slate-800">

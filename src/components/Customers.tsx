@@ -1,6 +1,8 @@
 "use client";
 
 import axios from "axios";
+import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -56,8 +58,16 @@ export default function Customers({ onDone }: { onDone: () => void }) {
   const [currentResId, serCurrentResId] = useState<number | null>(null);
   const [paidCustomers, setPaidCustomers] = useState([]);
   const [unpaidCustomers, setUnpaidCustomers] = useState([]);
-  const [onDisplay, setOnDisplay] = useState<"paid" | "unpaid" | "customers">("paid");
+  const [display, setDisplay] = useState<"paid" | "unpaid" | "customers">(() => {
+    const saved = localStorage.getItem("customerView");
+    if (saved === "paid" || saved === "unpaid" || saved === "customers") {
+      return saved;
+    }
+    return "paid";
+  });
   const [paymentFile, setPaymentFile] = useState<File | null>(null);
+  const [updating, setUpdating] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
 
   const [startDate, setStartDate] = useState(() => {
     const today = new Date().toISOString().split("T")[0];
@@ -148,66 +158,53 @@ export default function Customers({ onDone }: { onDone: () => void }) {
     }
   }
 
-  const handleUpdatePayment = async () => {
+  async function handleUpdatePayment() {
     if (!paymentDate) {
       setError("Payment date is required!");
       return;
     }
 
-    setError("");
-
+    setUpdating(true);
+  
     try {
+      let uploadedUrl = null;
+  
+      if (paymentFile) {
+        const data = new FormData();
+        data.append("file", paymentFile);
+        data.append("upload_preset", "fuvii-invoice");
+  
+        const cloudinaryRes = await axios.post(
+          "https://api.cloudinary.com/v1_1/dzr9nt9aj/auto/upload",
+          data
+        );
+  
+        uploadedUrl = cloudinaryRes.data.secure_url;
+      }
+  
+      // Now send URL to backend ✔
       const payload = {
         currentResId,
         paymentDate,
         paymentNotes,
         isPartial,
-        paymentFile,
-      }
+        paymentFileUrl: uploadedUrl
+      };
+  
       await axios.post(`${API}/restaurant/update-payment`, payload);
-
+  
       alert("Payment updated successfully!");
       setUpdatePayment(false);
       serCurrentResId(null);
       window.location.reload();
+  
     } catch (err) {
       console.error(err);
-      setError("Failed to update payment.");
+      setError("Upload failed. Try again.");
+    } finally {
+      setUpdating(false);
     }
-  };
-  // const handleUpdatePayment = async () => {
-  //   if (!paymentDate) {
-  //     setError("Payment date is required!");
-  //     return;
-  //   }
-  
-  //   setError("");
-  
-  //   try {
-  //     const formData = new FormData();
-  //     formData.append("currentResId", String(currentResId));
-  //     formData.append("paymentDate", paymentDate);
-  //     formData.append("paymentNotes", paymentNotes);
-  //     formData.append("isPartial", isPartial);
-  
-  //     if (paymentFile) {
-  //       formData.append("paymentProof", paymentFile);
-  //     }
-  
-  //     await axios.post(`${API}/restaurant/update-payment`, formData, {
-  //       headers: { "Content-Type": "multipart/form-data" }
-  //     });
-  
-  //     alert("Payment updated successfully!");
-  //     setUpdatePayment(false);
-  //     serCurrentResId(null);
-  //     window.location.reload();
-  
-  //   } catch (err) {
-  //     console.error(err);
-  //     setError("Failed to update payment.");
-  //   }
-  // };
+  }
 
   useEffect(() => {
     axios.get(`${API}/restaurant`).then((res) => {
@@ -216,6 +213,7 @@ export default function Customers({ onDone }: { onDone: () => void }) {
       const unpaid = res.data?.filter((res: any) => res.invoices.length > 0 &&  res.invoices.at(-1).status === "pending");
       if (paid) setPaidCustomers(paid);
       if (unpaid) setUnpaidCustomers(unpaid);
+      console.log(paid);
     });
   }, []);
 
@@ -227,6 +225,25 @@ export default function Customers({ onDone }: { onDone: () => void }) {
       } catch {}
     })();
   }, []);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("customerView");
+    if (saved === "paid" || saved === "unpaid" || saved === "customers") {
+      setDisplay(saved);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("customerView", display);
+  }, [display]);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  if (!hydrated) {
+    return null;
+  }
 
   if (restaurants.length === 0) {
     return (
@@ -249,20 +266,20 @@ export default function Customers({ onDone }: { onDone: () => void }) {
           
           <div className="flex items-center justify-center">
             <button
-              className={`flex-1 flex items-center justify-center py-2 ${onDisplay === "unpaid" ? "bg-blue-700 text-white font-semibold" : "bg-gray-200 text-black"} `}
-              onClick={() => setOnDisplay("unpaid")}
+              className={`flex-1 flex items-center justify-center py-2 ${display === "unpaid" ? "bg-blue-700 text-white font-semibold" : "bg-gray-200 text-black"} `}
+              onClick={() => setDisplay("unpaid")}
             >Unpaid Invoice</button>
             <button
-              className={`flex-1 flex items-center justify-center py-2 ${onDisplay === "paid" ? "bg-blue-700 text-white font-semibold" : "bg-gray-200 text-black"} `}
-              onClick={() => setOnDisplay("paid")}
+              className={`flex-1 flex items-center justify-center py-2 ${display === "paid" ? "bg-blue-700 text-white font-semibold" : "bg-gray-200 text-black"} `}
+              onClick={() => setDisplay("paid")}
             >Paid Invoice</button>
             <button
-              className={`flex-1 flex items-center justify-center py-2 ${onDisplay === "customers" ? "bg-blue-700 text-white font-semibold" : "bg-gray-200 text-black"} `}
-              onClick={() => setOnDisplay("customers")}
+              className={`flex-1 flex items-center justify-center py-2 ${display === "customers" ? "bg-blue-700 text-white font-semibold" : "bg-gray-200 text-black"} `}
+              onClick={() => setDisplay("customers")}
             >All Customers</button>
           </div>
 
-          {onDisplay === "customers" && (
+          {display === "customers" && (
             <div>
               <div className="overflow-x-auto bg-white shadow-md rounded-lg border border-gray-200">
                 <table className="w-full text-sm">
@@ -391,13 +408,30 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                           </div>
                         </td>
     
-                        {/* PAID (dummy) */}
-                        <td className="p-4 border-r text-center leading-5">
+                        {/* PAID */}
+                        <td className="p-1 border-r text-center leading-5">
                           {r.invoices?.[r.invoices.length - 1]?.status === "pending" ? "-" : (
                             <div>
                               <div className="font-medium">Paid on</div>
-                              <div className="text-gray-700">25/11/2025</div>
+                              <div className="text-gray-700">{r.invoices.at(-1)?.paymentDate?.split("T")[0]}</div>
                               <div className="text-xs text-gray-500 italic">Tax Invoice</div>
+                              {r.invoices.at(-1)?.paymentFileUrl ? (
+                                <Link
+                                  href={r.invoices.at(-1)?.paymentFileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 text-xs font-medium underline hover:text-blue-800 transition"
+                                >
+                                  View Receipt
+                                </Link>
+                              ) : (
+                                <span className="text-gray-400 text-xs">No Proof</span>
+                              )}
+                              {r.invoices.at(-1)?.paymentNotes && (
+                                <p className="text-gray-600 text-xs italic mt-1">
+                                  {r.invoices.at(-1).paymentNotes}
+                                </p>
+                              )}
                             </div>
                           )}
                         </td>
@@ -436,7 +470,7 @@ export default function Customers({ onDone }: { onDone: () => void }) {
             </div>
           )}
           
-          {onDisplay === "paid" && (
+          {display === "paid" && (
             <div>
               <div className="overflow-x-auto bg-white shadow-md rounded-lg border border-gray-200">
                 <table className="w-full text-sm">
@@ -445,7 +479,7 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                       <th className="p-3 border-r text-center font-semibold">Outlet</th>
                       <th className="p-3 border-r text-center font-semibold">Subscription Type</th>
                       <th className="p-3 border-r text-center font-semibold">Proforma Invoice</th>
-                      <th className="p-3 border-r text-center font-semibold">Pending</th>
+                      <th className="p-3 border-r text-center font-semibold">Payment Docs</th>
                       <th className="p-3 border-r text-center font-semibold">Paid</th>
                       <th className="p-3 border-r text-center font-semibold">Initial Churn</th>
                       <th className="p-3 border-r text-center font-semibold">Churn</th>
@@ -556,21 +590,37 @@ export default function Customers({ onDone }: { onDone: () => void }) {
 
                         </td>
 
-                        {/* PENDING */}
+                        {/* Payment Docs */}
                         <td className="p-4 border-r text-center leading-5">
-                          <div className="text-red-600 font-semibold">
-                            -
+                          <div className="flex flex-col items-center gap-1">
+
+                            {r.invoices.at(-1)?.paymentFileUrl ? (
+                              <Link
+                                href={r.invoices.at(-1)?.paymentFileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 text-xs font-medium underline hover:text-blue-800 transition"
+                              >
+                                View Receipt
+                              </Link>
+                            ) : (
+                              <span className="text-gray-400 text-xs">No Proof</span>
+                            )}
+
+                            {r.invoices.at(-1)?.paymentNotes && (
+                              <p className="text-gray-600 text-xs italic mt-1">
+                                {r.invoices.at(-1).paymentNotes}
+                              </p>
+                            )}
+
                           </div>
                         </td>
 
-                        {/* PAID (dummy) */}
+                        {/* PAID */}
                         <td className="p-4 border-r text-center leading-5">
                           <div className="font-medium">Paid on</div>
                           <div className="text-gray-700">{r.invoices.at(-1)?.paymentDate?.split("T")[0]}</div>
                           <div className="text-xs text-gray-500 italic">Tax Invoice</div>
-                          {r.invoices.at(-1)?.paymentNotes && (
-                            <div className="mt-2">{r.invoices.at(-1).paymentNotes}</div>
-                          )}
                         </td>
 
                         {/* INITIAL CHURN (dummy) */}
@@ -614,7 +664,7 @@ export default function Customers({ onDone }: { onDone: () => void }) {
             </div>
           )}
 
-          {onDisplay === "unpaid" && (
+          {display === "unpaid" && (
             <div>
               <div className="overflow-x-auto bg-white shadow-md rounded-lg border border-gray-200">
                 <table className="w-full text-sm">
@@ -1216,11 +1266,25 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                 </button>
 
                 <button
-                  className="px-4 py-2 text-sm rounded-md bg-sky-600 text-white shadow
-                  hover:bg-sky-700 focus:ring-2 focus:ring-sky-400 transition-all"
+                  disabled={updating}
                   onClick={handleUpdatePayment}
+                  className={`
+                    relative px-4 py-2 text-sm rounded-md font-medium
+                    transition-all duration-200
+                    ${updating
+                      ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                      : "bg-sky-600 text-white shadow hover:bg-sky-700 focus:ring-2 focus:ring-sky-400"
+                    }
+                  `}
                 >
-                  Update
+                  {updating ? (
+                    <span className="flex items-center gap-2">
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      Updating…
+                    </span>
+                  ) : (
+                    "Update"
+                  )}
                 </button>
               </div>
 
