@@ -11,6 +11,7 @@ export default function AddBusiness() {
     GSTIN: "",
     PrimaryContactName: "",
     PrimaryContactPhone: "",
+    PrimaryContactEmail: "",
   });
 
   const handleChange = (e: any) => {
@@ -18,6 +19,13 @@ export default function AddBusiness() {
   };
 
   const handleSubmit = async () => {
+    
+    const missingFields = Object.entries(form).filter(([_, value]) => !value);
+    if (missingFields.length > 0) {
+      alert("Please fill all required fields.");
+      return;
+    }
+
     try {
       const URL = process.env.NEXT_PUBLIC_API_URL;
       const res = await axios.post(`${URL}/business`, form);
@@ -91,6 +99,16 @@ export default function AddBusiness() {
             <input
               name="PrimaryContactPhone"
               placeholder="Phone Number"
+              onChange={handleChange}
+              className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
+          
+          <div>
+            <label className="block font-medium mb-1">Contact Email Address</label>
+            <input
+              name="PrimaryContactEmail"
+              placeholder="Type Email Address"
               onChange={handleChange}
               className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
             />

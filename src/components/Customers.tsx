@@ -63,7 +63,7 @@ export default function Customers({ onDone }: { onDone: () => void }) {
     if (saved === "paid" || saved === "unpaid" || saved === "customers") {
       return saved;
     }
-    return "paid";
+    return "customers";
   });
   const [paymentFile, setPaymentFile] = useState<File | null>(null);
   const [updating, setUpdating] = useState(false);
@@ -87,6 +87,7 @@ export default function Customers({ onDone }: { onDone: () => void }) {
   const [paymentDate, setPaymentDate] = useState("");
   const [paymentNotes, setPaymentNotes] = useState("");
   const [isPartial, setIsPartial] = useState("No");
+  const [partialAmount, setPartialAmount] = useState<number | null>(null);
   const [error, setError] = useState("");
 
   async function selectRestaurant(restaurantId: any) {
@@ -139,6 +140,7 @@ export default function Customers({ onDone }: { onDone: () => void }) {
     if (!startDate) return alert("Please include start date.");
     if (!planMode) return alert("Please include plan mode.");
     if (planMode === "trial" && !trialDays) return alert("Please include trial days.");
+    if (!currentPlan) return alert("No plan assigned on this business.");
     const payload = {
       restaurantId,
       pricingPlanId: currentPlan?.id,
@@ -147,10 +149,9 @@ export default function Customers({ onDone }: { onDone: () => void }) {
       planMode,
       trialDays,
     };
-    console.log(payload);
     try {
       await axios.post(`${API}/restaurant/update-tax-settings`, payload);
-      alert("Plan assigned successfully");
+      alert("Tax settings applied successfully.");
       setPlanEditingModal(false);
       window.location.reload();
     } catch (err) {
@@ -182,15 +183,14 @@ export default function Customers({ onDone }: { onDone: () => void }) {
         uploadedUrl = cloudinaryRes.data.secure_url;
       }
   
-      // Now send URL to backend ✔
       const payload = {
         currentResId,
         paymentDate,
         paymentNotes,
         isPartial,
+        partialAmount: isPartial === "Yes" ? partialAmount : null,
         paymentFileUrl: uploadedUrl
       };
-  
       await axios.post(`${API}/restaurant/update-payment`, payload);
   
       alert("Payment updated successfully!");
@@ -210,10 +210,12 @@ export default function Customers({ onDone }: { onDone: () => void }) {
     axios.get(`${API}/restaurant`).then((res) => {
       setRestaurants(res.data);
       const paid = res.data?.filter((res: any) => res.invoices.length > 0 &&  res.invoices.at(-1).status === "paid");
-      const unpaid = res.data?.filter((res: any) => res.invoices.length > 0 &&  res.invoices.at(-1).status === "pending");
+      const unpaid = res.data?.filter((res: any) => 
+        res.invoices.length > 0 &&  res.invoices.at(-1).status === "pending" ||
+        res.invoices.length > 0 &&  res.invoices.at(-1).status === "partially paid"
+      );
       if (paid) setPaidCustomers(paid);
       if (unpaid) setUnpaidCustomers(unpaid);
-      console.log(paid);
     });
   }, []);
 
@@ -402,8 +404,9 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                         {/* PENDING */}
                         <td className="p-4 border-r text-center leading-5">
                           <div className="text-red-600 font-semibold">
-                            {r.invoices?.[r.invoices.length - 1]?.status === "pending" ? (
-                              <p>${r.invoices?.[r.invoices.length - 1]?.totalAmount}</p>
+                            {r.invoices?.[r.invoices.length - 1]?.status === "pending"
+                            || r.invoices?.[r.invoices.length - 1]?.status === "partially paid" ? (
+                              <p>${r.invoices?.[r.invoices.length - 1]?.remainingAmount}</p>
                             ) : "-"}
                           </div>
                         </td>
@@ -415,7 +418,7 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                               <div className="font-medium">Paid on</div>
                               <div className="text-gray-700">{r.invoices.at(-1)?.paymentDate?.split("T")[0]}</div>
                               <div className="text-xs text-gray-500 italic">Tax Invoice</div>
-                              {r.invoices.at(-1)?.paymentFileUrl ? (
+                              {r.invoices.at(-1)?.paymentFileUrl && (
                                 <Link
                                   href={r.invoices.at(-1)?.paymentFileUrl}
                                   target="_blank"
@@ -424,8 +427,6 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                                 >
                                   View Receipt
                                 </Link>
-                              ) : (
-                                <span className="text-gray-400 text-xs">No Proof</span>
                               )}
                               {r.invoices.at(-1)?.paymentNotes && (
                                 <p className="text-gray-600 text-xs italic mt-1">
@@ -604,7 +605,7 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                                 View Receipt
                               </Link>
                             ) : (
-                              <span className="text-gray-400 text-xs">No Proof</span>
+                              <span className="text-gray-400 text-xs">No docs added</span>
                             )}
 
                             {r.invoices.at(-1)?.paymentNotes && (
@@ -789,6 +790,9 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                           <div className="text-red-600 font-semibold">
                             {r.invoices?.[r.invoices.length - 1]?.status === "pending" && (
                               <p>${r.invoices?.[r.invoices.length - 1]?.totalAmount}</p>
+                            )}
+                            {r.invoices?.[r.invoices.length - 1]?.status === "partially paid" && (
+                              <p>${r.invoices?.[r.invoices.length - 1]?.remainingAmount}</p>
                             )}
                           </div>
                         </td>
@@ -1235,10 +1239,26 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                   className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50 focus:bg-white
                   focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none cursor-pointer transition-all"
                 >
-                  <option value="No">No</option> {/* ⭐ Default */}
+                  <option value="No">No</option>
                   <option value="Yes">Yes</option>
                 </select>
               </div>
+
+              {isPartial === "Yes" && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium text-gray-700">Partial Payment Amount (₹)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50 focus:bg-white
+                    focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
+                    value={partialAmount ?? ""}
+                    onChange={(e) => setPartialAmount(Number(e.target.value))}
+                    placeholder="Enter partial payment amount"
+                    required
+                  />
+                </div>
+              )}
 
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium text-gray-700">Upload Payment Proof</label>

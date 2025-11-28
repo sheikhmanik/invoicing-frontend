@@ -10,6 +10,7 @@ type BusinessForm = {
   GSTIN: string;
   PrimaryContactName: string;
   PrimaryContactPhone: string;
+  PrimaryContactEmail: string;
 };
 
 export default function SelectBusiness({ onSelect }: any) {
@@ -25,6 +26,7 @@ export default function SelectBusiness({ onSelect }: any) {
     GSTIN: "",
     PrimaryContactName: "",
     PrimaryContactPhone: "",
+    PrimaryContactEmail: "",
   });
 
   // Handle input updates
@@ -36,20 +38,9 @@ export default function SelectBusiness({ onSelect }: any) {
   const handleSubmit = async () => {
     try {
 
-      const requiredFields: { key: keyof BusinessForm, label: string }[] = [
-        { key: "name", label: "Business Name" },
-        { key: "address", label: "Address" },
-        { key: "location", label: "Location" },
-        { key: "GSTIN", label: "GSTIN" },
-        { key: "PrimaryContactName", label: "Contact Name" },
-        { key: "PrimaryContactPhone", label: "Contact Phone" },
-      ];
-
-      for (const field of requiredFields) {
-        if (!form[field.key].trim()) {
-          alert(`${field.label} is required`);
-          return;
-        }
+      const missingFields = Object.entries(form).filter(([_, value]) => !value);
+      if (missingFields.length > 0) {
+        return alert("Please fill all required fields.")
       }
 
       if (form.GSTIN.trim().length !== 15) {
@@ -63,7 +54,7 @@ export default function SelectBusiness({ onSelect }: any) {
       }
 
       const URL = process.env.NEXT_PUBLIC_API_URL;
-      const res = await axios.post(`${URL}/business`, form);
+      await axios.post(`${URL}/business`, form);
 
       // Close modal
       setCreatingNewBusiness(false);
@@ -76,6 +67,7 @@ export default function SelectBusiness({ onSelect }: any) {
         GSTIN: "",
         PrimaryContactName: "",
         PrimaryContactPhone: "",
+        PrimaryContactEmail: "",
       });
 
       // Reload business list
@@ -164,9 +156,8 @@ export default function SelectBusiness({ onSelect }: any) {
       {/* MODAL */}
       {creatingNewBusiness && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 overflow-y-auto">
-          <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-lg relative animate-fadeIn">
+          <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-lg relative animate-fadeIn h-[90vh] overflow-y-auto">
             
-            {/* Close button */}
             <button
               onClick={() => setCreatingNewBusiness(false)}
               className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-xl"
@@ -184,6 +175,7 @@ export default function SelectBusiness({ onSelect }: any) {
               <Input label="GSTIN" name="GSTIN" onChange={handleChange} />
               <Input label="Primary Contact Name" name="PrimaryContactName" onChange={handleChange} />
               <Input label="Primary Contact Phone" name="PrimaryContactPhone" onChange={handleChange} />
+              <Input label="Primary Contact Email" name="PrimaryContactEmail" onChange={handleChange} />
 
               <button
                 onClick={handleSubmit}

@@ -31,6 +31,7 @@ function numberToWords(num: number): string {
     "Eighteen",
     "Nineteen",
   ];
+  
   const b = [
     "",
     "",
@@ -49,11 +50,17 @@ function numberToWords(num: number): string {
   if (num < 100)
     return `${b[Math.floor(num / 10)]} ${a[num % 10]}`.trim();
   if (num < 1000)
-    return `${a[Math.floor(num / 100)]} Hundred ${numberToWords(num % 100)}`.trim();
+    return `${a[Math.floor(num / 100)]} Hundred${
+      num % 100 !== 0 ? " " + numberToWords(num % 100) : ""
+    }`;
   if (num < 100000)
-    return `${numberToWords(Math.floor(num / 1000))} Thousand ${numberToWords(num % 1000)}`.trim();
+    return `${numberToWords(Math.floor(num / 1000))} Thousand${
+      num % 1000 !== 0 ? " " + numberToWords(num % 1000) : ""
+    }`;
   if (num < 10000000)
-    return `${numberToWords(Math.floor(num / 100000))} Lakh ${numberToWords(num % 100000)}`.trim();
+    return `${numberToWords(Math.floor(num / 100000))} Lakh${
+      num % 100000 !== 0 ? " " + numberToWords(num % 100000) : ""
+    }`;
 
   return "Amount too large";
 }
@@ -69,7 +76,10 @@ interface RestaurantInvoice {
   invoiceNumber: string;
   subTotalAmount: number;
   totalAmount: number;
+  partialAmount: number;
+  remainingAmount: number;
   status: "pending" | "paid";
+  paymentDate: string;
 }
 
 interface RestaurantBrand {
@@ -112,11 +122,11 @@ export default function ProformaInvoice() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    if (!loading && restaurant) {
-      setTimeout(() => window.print(), 500);
-    }
-  }, [loading, restaurant]);
+  // useEffect(() => {
+  //   if (!loading && restaurant) {
+  //     setTimeout(() => window.print(), 500);
+  //   }
+  // }, [loading, restaurant]);
 
   if (loading) {
     return <div className="text-center my-20">Loading invoice...</div>;
@@ -255,6 +265,29 @@ export default function ProformaInvoice() {
             </td>
             <td className="border p-2 text-center">₹{totalAmount}.00/-</td>
           </tr>
+          
+          {invoice.partialAmount && (
+            <tr className="bg-green-50 font-medium">
+              <td colSpan={3} className="border p-2 text-right text-green-700">
+                Partially Paid on {invoice.paymentDate?.split("T")[0] || "—"}
+              </td>
+              <td className="border p-2 text-center text-green-700">
+                ₹{invoice.partialAmount}.00/-
+              </td>
+            </tr>
+          )}
+
+          {invoice.remainingAmount !== undefined && (
+            <tr className="bg-red-50 font-semibold">
+              <td colSpan={3} className="border p-2 text-right text-red-700">
+                Remaining Amount Due
+              </td>
+              <td className="border p-2 text-center text-red-700">
+                ₹{Math.max(invoice.remainingAmount, 0)}.00/-
+              </td>
+            </tr>
+          )}
+
         </tbody>
       </table>
 
