@@ -266,16 +266,24 @@ export default function ProformaInvoice() {
             <td className="border p-2 text-center">₹{totalAmount}.00/-</td>
           </tr>
           
-          {invoice.partialAmount && (
-            <tr className="bg-green-50 font-medium">
-              <td colSpan={3} className="border p-2 text-right text-green-700">
-                Partially Paid on {invoice.paymentDate?.split("T")[0] || "—"}
-              </td>
-              <td className="border p-2 text-center text-green-700">
-                ₹{invoice.partialAmount}.00/-
-              </td>
-            </tr>
-          )}
+          {/* PARTIAL PAYMENT RECORDS */}
+          {restaurant.invoices
+            ?.filter((inv: any) => inv.status === "partially paid")
+            .map((inv: any, index: number) => (
+              <tr key={index} className="bg-green-50 font-medium">
+                <td colSpan={3} className="border p-2 text-right text-green-700">
+                  Partially Paid — {inv.paymentDate?.split("T")[0] || "—"}
+                  {inv.paymentNotes && (
+                    <div className="text-xs text-gray-600 italic mt-1">
+                      {inv.paymentNotes}
+                    </div>
+                  )}
+                </td>
+                <td className="border p-2 text-center text-green-700">
+                  ₹{inv.partialAmount}.00/-
+                </td>
+              </tr>
+          ))}
 
           {invoice.remainingAmount !== undefined && (
             <tr className="bg-red-50 font-semibold">

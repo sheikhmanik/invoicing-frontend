@@ -412,7 +412,7 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                         </td>
     
                         {/* PAID */}
-                        <td className="p-1 border-r text-center leading-5">
+                        {/* <td className="p-1 border-r text-center leading-5">
                           {r.invoices?.[r.invoices.length - 1]?.status === "pending" ? "-" : (
                             <div>
                               <div className="font-medium">Paid on</div>
@@ -435,6 +435,96 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                               )}
                             </div>
                           )}
+                        </td> */}
+
+                        <td className="p-4 border-r text-center leading-5">
+
+                          {/* still loading or no invoices */}
+                          {(!r.invoices || r.invoices.length === 0) && "—"}
+
+                          {(() => {
+                            const invoices = r.invoices || [];
+                            const latest = invoices.at(-1);
+                            const partials = invoices.filter((inv: any) => inv.status === "partially paid");
+
+                            // CASE 1 → no payments yet (pending only)
+                            if (latest?.status === "pending" && partials.length === 0) {
+                              return (
+                                <div className="text-gray-600 text-sm italic">
+                                  No payments made yet
+                                </div>
+                              );
+                            }
+
+                            // CASE 2 → there are partial payments → show all of them
+                            if (partials.length > 0) {
+                              return (
+                                <div className="space-y-2">
+
+                                  {partials.map((inv: any, i: number) => (
+                                    <div
+                                      key={i}
+                                      className="bg-orange-50 border border-orange-200 rounded p-2 text-xs shadow-sm"
+                                    >
+                                      <div className="font-medium text-orange-700">
+                                        Paid: ₹{inv.partialAmount}/-
+                                      </div>
+
+                                      <div className="text-gray-700">
+                                        Date: {inv.paymentDate?.split("T")[0]}
+                                      </div>
+
+                                      {/* Remaining Amount */}
+                                      {inv.remainingAmount !== null && (
+                                        <div
+                                          className={`font-semibold mt-1 
+                                          ${inv.remainingAmount > 0 ? "text-red-600" : "text-green-700"}`}
+                                        >
+                                          Remaining: ₹{Math.max(0, inv.remainingAmount)}/-
+                                        </div>
+                                      )}
+
+                                      {/* Receipt link */}
+                                      {inv.paymentFileUrl && (
+                                        <Link
+                                          href={inv.paymentFileUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-blue-600 underline block mt-1 font-medium"
+                                        >
+                                          View Receipt
+                                        </Link>
+                                      )}
+
+                                      {/* Notes */}
+                                      {inv.paymentNotes && (
+                                        <div className="text-gray-600 italic mt-1">
+                                          {inv.paymentNotes}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+
+                                </div>
+                              );
+                            }
+
+                            // CASE 3 → fully paid invoice
+                            if (latest?.status === "paid") {
+                              return (
+                                <div className="space-y-1 text-xs">
+                                  <div className="font-medium text-green-700">Paid</div>
+                                  <div className="text-gray-700">
+                                    {latest.paymentDate?.split("T")[0]}
+                                  </div>
+                                  <div className="text-gray-500 italic">Tax Invoice</div>
+                                </div>
+                              );
+                            }
+
+                            return null;
+                          })()}
+
                         </td>
     
                         {/* INITIAL CHURN */}
@@ -619,9 +709,93 @@ export default function Customers({ onDone }: { onDone: () => void }) {
 
                         {/* PAID */}
                         <td className="p-4 border-r text-center leading-5">
-                          <div className="font-medium">Paid on</div>
-                          <div className="text-gray-700">{r.invoices.at(-1)?.paymentDate?.split("T")[0]}</div>
-                          <div className="text-xs text-gray-500 italic">Tax Invoice</div>
+
+                          {/* still loading or no invoices */}
+                          {(!r.invoices || r.invoices.length === 0) && "—"}
+
+                          {(() => {
+                            const invoices = r.invoices || [];
+                            const latest = invoices.at(-1);
+                            const partials = invoices.filter((inv: any) => inv.status === "partially paid");
+
+                            // CASE 1 → no payments yet (pending only)
+                            if (latest?.status === "pending" && partials.length === 0) {
+                              return (
+                                <div className="text-gray-600 text-sm italic">
+                                  No payments made yet
+                                </div>
+                              );
+                            }
+
+                            // CASE 2 → there are partial payments → show all of them
+                            if (partials.length > 0) {
+                              return (
+                                <div className="space-y-2">
+
+                                  {partials.map((inv: any, i: number) => (
+                                    <div
+                                      key={i}
+                                      className="bg-orange-50 border border-orange-200 rounded p-2 text-xs shadow-sm"
+                                    >
+                                      <div className="font-medium text-orange-700">
+                                        Paid: ₹{inv.partialAmount}/-
+                                      </div>
+
+                                      <div className="text-gray-700">
+                                        Date: {inv.paymentDate?.split("T")[0]}
+                                      </div>
+
+                                      {/* Remaining Amount */}
+                                      {inv.remainingAmount !== null && (
+                                        <div
+                                          className={`font-semibold mt-1 
+                                          ${inv.remainingAmount > 0 ? "text-red-600" : "text-green-700"}`}
+                                        >
+                                          Remaining: ₹{Math.max(0, inv.remainingAmount)}/-
+                                        </div>
+                                      )}
+
+                                      {/* Receipt link */}
+                                      {inv.paymentFileUrl && (
+                                        <Link
+                                          href={inv.paymentFileUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-blue-600 underline block mt-1 font-medium"
+                                        >
+                                          View Receipt
+                                        </Link>
+                                      )}
+
+                                      {/* Notes */}
+                                      {inv.paymentNotes && (
+                                        <div className="text-gray-600 italic mt-1">
+                                          {inv.paymentNotes}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+
+                                </div>
+                              );
+                            }
+
+                            // CASE 3 → fully paid invoice
+                            if (latest?.status === "paid") {
+                              return (
+                                <div className="space-y-1 text-xs">
+                                  <div className="font-medium text-green-700">Paid</div>
+                                  <div className="text-gray-700">
+                                    {latest.paymentDate?.split("T")[0]}
+                                  </div>
+                                  <div className="text-gray-500 italic">Tax Invoice</div>
+                                </div>
+                              );
+                            }
+
+                            return null;
+                          })()}
+
                         </td>
 
                         {/* INITIAL CHURN (dummy) */}
@@ -676,7 +850,7 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                       <th className="p-3 border-r text-center font-semibold">Proforma Invoice</th>
                       <th className="p-3 border-r text-center font-semibold">Pending</th>
                       <th className="p-3 border-r text-center font-semibold">Due For</th>
-                      <th className="p-3 border-r text-center font-semibold">Initial Churn</th>
+                      <th className="p-3 border-r text-center font-semibold">Paid</th>
                       <th className="p-3 border-r text-center font-semibold">Churn</th>
                       <th className="p-3 text-center font-semibold">Update</th>
                     </tr>
@@ -814,9 +988,95 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                           })()}
                         </td>
 
-                        {/* INITIAL CHURN (dummy) */}
-                        <td className="p-4 border-r text-center font-medium">
-                          -
+                        {/* PAID */}
+                        <td className="p-4 border-r text-center leading-5">
+
+                          {/* still loading or no invoices */}
+                          {(!r.invoices || r.invoices.length === 0) && "—"}
+
+                          {(() => {
+                            const invoices = r.invoices || [];
+                            const latest = invoices.at(-1);
+                            const partials = invoices.filter((inv: any) => inv.status === "partially paid");
+
+                            // CASE 1 → no payments yet (pending only)
+                            if (latest?.status === "pending" && partials.length === 0) {
+                              return (
+                                <div className="text-gray-600 text-sm italic">
+                                  No payments made yet
+                                </div>
+                              );
+                            }
+
+                            // CASE 2 → there are partial payments → show all of them
+                            if (partials.length > 0) {
+                              return (
+                                <div className="space-y-2">
+
+                                  {partials.map((inv: any, i: number) => (
+                                    <div
+                                      key={i}
+                                      className="bg-orange-50 border border-orange-200 rounded p-2 text-xs shadow-sm"
+                                    >
+                                      <div className="font-medium text-orange-700">
+                                        Paid: ₹{inv.partialAmount}/-
+                                      </div>
+
+                                      <div className="text-gray-700">
+                                        Date: {inv.paymentDate?.split("T")[0]}
+                                      </div>
+
+                                      {/* Remaining Amount */}
+                                      {inv.remainingAmount !== null && (
+                                        <div
+                                          className={`font-semibold mt-1 
+                                          ${inv.remainingAmount > 0 ? "text-red-600" : "text-green-700"}`}
+                                        >
+                                          Remaining: ₹{Math.max(0, inv.remainingAmount)}/-
+                                        </div>
+                                      )}
+
+                                      {/* Receipt link */}
+                                      {inv.paymentFileUrl && (
+                                        <Link
+                                          href={inv.paymentFileUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-blue-600 underline block mt-1 font-medium"
+                                        >
+                                          View Receipt
+                                        </Link>
+                                      )}
+
+                                      {/* Notes */}
+                                      {inv.paymentNotes && (
+                                        <div className="text-gray-600 italic mt-1">
+                                          {inv.paymentNotes}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+
+                                </div>
+                              );
+                            }
+
+                            // CASE 3 → fully paid invoice
+                            if (latest?.status === "paid") {
+                              return (
+                                <div className="space-y-1 text-xs">
+                                  <div className="font-medium text-green-700">Paid</div>
+                                  <div className="text-gray-700">
+                                    {latest.paymentDate?.split("T")[0]}
+                                  </div>
+                                  <div className="text-gray-500 italic">Tax Invoice</div>
+                                </div>
+                              );
+                            }
+
+                            return null;
+                          })()}
+
                         </td>
 
                         {/* CHURN (dummy) */}
