@@ -3,7 +3,7 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
 
-export default function AddRestaurant() {
+export default function AddRestaurant({ onDone }: { onDone: () => void }) {
   const [brands, setBrands] = useState([]);
   const [form, setForm] = useState({
     name: "",
@@ -29,14 +29,16 @@ export default function AddRestaurant() {
   };
 
   const handleSubmit = async () => {
+    const missingFields = Object.entries(form).filter(([_, value]) => !value);
+    if (missingFields.length > 0) return alert("Please fill the form.");
     try {
       const URL = process.env.NEXT_PUBLIC_API_URL;
       await axios.post(`${URL}/restaurant`, {
         ...form,
         brandId: Number(form.brandId),
       });
-
       alert("Restaurant Created Successfully!");
+      onDone();
     } catch (err) {
       console.error(err);
       alert("Failed to create restaurant");

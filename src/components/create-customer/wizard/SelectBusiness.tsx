@@ -155,8 +155,14 @@ export default function SelectBusiness({ onSelect }: any) {
 
       {/* MODAL */}
       {creatingNewBusiness && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 overflow-y-auto">
-          <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-lg relative animate-fadeIn h-[90vh] overflow-y-auto">
+        <div
+          onClick={() => setCreatingNewBusiness(false)}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 overflow-y-auto"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white p-6 rounded-xl shadow-lg w-full max-w-lg relative animate-fadeIn h-[90vh] overflow-y-auto"
+          >
             
             <button
               onClick={() => setCreatingNewBusiness(false)}

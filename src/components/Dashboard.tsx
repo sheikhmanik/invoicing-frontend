@@ -75,7 +75,7 @@ export default function Dashboard() {
 
           <nav className="space-y-1 text-sm">
             {[
-              "Dashboard", "Customer", "Create Customer", "Add Business", "Add Brand", "Add Restaurant", "Plan Listing", "Pricing plan setup", "Add Product", "Create Proforma", "Create Invoice",
+              "Dashboard", "Customers", "Create Customer", "Add Business", "Add Brand", "Add Restaurant", "Plan Listing", "Pricing plan setup", "Add Product", "Create Proforma", "Create Invoice",
               "Pending Invoices", "Paid Invoices",
               "MRR / ARR", "Churn"
             ].map((item) => (
@@ -184,24 +184,24 @@ export default function Dashboard() {
             </div>
           )}
 
+          {display === "Customers" && (
+            <Customers onDone={() => setDisplay("Customers")} />
+          )}
+
           {display === "Create Customer" && (
-            <CustomerWizard onDone={() => setDisplay("Customer")} />
+            <CustomerWizard onDone={() => setDisplay("Customers")} />
           )}
 
           {display === "Add Business" && (
-            <AddBusiness/>
+            <AddBusiness onDone={() => setDisplay("Add Brand")}/>
           )}
           
           {display === "Add Brand" && (
-            <AddBrand/>
+            <AddBrand onDone={() => setDisplay("Add Restaurant")} />
           )}
           
           {display === "Add Restaurant" && (
-            <AddRestaurant/>
-          )}
-          
-          {display === "Customer" && (
-            <Customers onDone={() => setDisplay("Customer")} />
+            <AddRestaurant onDone={() => setDisplay("Customers")} />
           )}
           
           {display === "Plan Listing" && (

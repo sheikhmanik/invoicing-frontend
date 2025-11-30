@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 
-export default function AddBrand() {
+export default function AddBrand({ onDone }: { onDone: () => void }) {
   const [businesses, setBusinesses] = useState([]);
   const [form, setForm] = useState({
     name: "",
@@ -23,14 +23,17 @@ export default function AddBrand() {
   };
 
   const handleSubmit = async () => {
+    if (!form.businessId) return alert("Please select a business.");
+    if (!form.name) return alert("Brand name is required.");
     try {
       const URL = process.env.NEXT_PUBLIC_API_URL;
       await axios.post(`${URL}/brand`, {
         name: form.name,
         businessId: Number(form.businessId),
       });
-
+      setForm((prev) => ({...prev, name: ""}));
       alert("Brand Created Successfully!");
+      onDone();
     } catch (err) {
       console.error(err);
       alert("Error creating brand");
@@ -67,6 +70,7 @@ export default function AddBrand() {
             <input
               name="name"
               placeholder="Brand Name"
+              value={form.name}
               onChange={handleChange}
               className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
             />

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import axios from "axios";
 
-export default function AddBusiness() {
+export default function AddBusiness({ onDone }: { onDone: () => void }) {
   const [form, setForm] = useState({
     name: "",
     address: "",
@@ -22,7 +22,7 @@ export default function AddBusiness() {
     
     const missingFields = Object.entries(form).filter(([_, value]) => !value);
     if (missingFields.length > 0) {
-      alert("Please fill all required fields.");
+      alert("Please fill form.");
       return;
     }
 
@@ -30,7 +30,7 @@ export default function AddBusiness() {
       const URL = process.env.NEXT_PUBLIC_API_URL;
       const res = await axios.post(`${URL}/business`, form);
       alert("Business Created!");
-      console.log(res.data);
+      onDone();
     } catch (err) {
       console.error(err);
       alert("Error creating business");

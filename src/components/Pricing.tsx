@@ -21,7 +21,6 @@ interface MeteredProduct {
 interface IncludedProduct {
   id?: number;
   productId: number;
-  credits: number | string;
   product: Product;
   isActive?: boolean;
 }
@@ -32,8 +31,9 @@ export interface PricingPlan {
   planName: string;
   description: string;
   fixedPrice?: number | string | null;
-  basePrice: number | string;
+  basePrice?: number | string;
   creditsIncluded: number | string;
+  billingCycle: number;
   validity: number;
   meteredProducts: MeteredProduct[];
   includedProducts: IncludedProduct[];
@@ -54,7 +54,7 @@ export default function Pricing() {
   const [planEditingModal, setPlanEditingModal] = useState(false);
 
   const [newProductName, setNewProductName] = useState("");
-  const [newProductCredit, setNewProductCredit] = useState("");
+  const [newProductLicense, setNewProductLicense] = useState("");
 
   const emptyPlan = (): PricingPlan => ({
     planType: "fixed",
@@ -63,6 +63,7 @@ export default function Pricing() {
     fixedPrice: "",
     basePrice: "",
     creditsIncluded: "",
+    billingCycle: 6,
     validity: 6,
     meteredProducts: [],
     includedProducts: [],
@@ -73,6 +74,7 @@ export default function Pricing() {
     try {
       const res = await axios.get<PricingPlan[]>(`${API}/pricing-plan`);
       setAllPlans(res.data || []);
+      console.log(res.data);
       if (!currentPlan && res.data && res.data.length > 0) {
         setCurrentPlan(res.data[0]);
         setIsCreatingNew(false);
@@ -110,7 +112,7 @@ export default function Pricing() {
     if (!newProductName.trim()) return alert("Product name required");
     try {
       const payload: any = { name: newProductName };
-      if (newProductCredit !== "") payload.credit = Number(newProductCredit);
+      if (newProductLicense !== "") payload.license = newProductLicense;
 
       const res = await axios.post(`${API}/products`, payload);
       const createdProduct: Product = res.data.product ?? res.data;
@@ -122,55 +124,6 @@ export default function Pricing() {
 
       if (!currentPlan) setCurrentPlan(emptyPlan());
 
-      // if (productType === "metered") {
-      //   setCurrentPlan(prev => {
-      //     const updated = prev
-      //       ? {
-      //           ...prev,
-      //           meteredProducts: prev.meteredProducts ?? [],
-      //           includedProducts: prev.includedProducts ?? []
-      //         }
-      //       : emptyPlan();
-      
-      //     updated.meteredProducts = [
-      //       ...updated.meteredProducts,
-      //       {
-      //         id: mpFromServer?.id,
-      //         productId: createdProduct.id,
-      //         credits: mpFromServer ? mpFromServer.credits : (newProductCredit ? Number(newProductCredit) : 0),
-      //         product: createdProduct,
-      //         isActive: mpFromServer ? mpFromServer.isActive : true
-      //       }
-      //     ];
-      
-      //     return updated;
-      //   });
-      // }
-      
-      // if (productType === "included") {
-      //   setCurrentPlan(prev => {
-      //     const updated = prev
-      //       ? {
-      //           ...prev,
-      //           meteredProducts: prev.meteredProducts ?? [],
-      //           includedProducts: prev.includedProducts ?? []
-      //         }
-      //       : emptyPlan();
-      
-      //     updated.includedProducts = [
-      //       ...updated.includedProducts,
-      //       {
-      //         id: ipFromServer?.id,
-      //         productId: createdProduct.id,
-      //         credits: ipFromServer ? ipFromServer.credits : (newProductCredit ? Number(newProductCredit) : 0),
-      //         product: createdProduct,
-      //         isActive: ipFromServer ? ipFromServer.isActive : true
-      //       }
-      //     ];
-      
-      //     return updated;
-      //   });
-      // }
       setCurrentPlan(prev => {
         const cloned = prev ? deepClonePlan(prev) : deepClonePlan(emptyPlan());
       
@@ -178,7 +131,7 @@ export default function Pricing() {
           cloned.meteredProducts.push({
             id: mpFromServer?.id,
             productId: createdProduct.id,
-            credits: mpFromServer ? mpFromServer.credits : Number(newProductCredit) || 0,
+            credits: mpFromServer ? mpFromServer.credits : Number(newProductLicense) || 0,
             product: createdProduct,
             isActive: mpFromServer?.isActive ?? true
           });
@@ -188,7 +141,6 @@ export default function Pricing() {
           cloned.includedProducts.push({
             id: ipFromServer?.id,
             productId: createdProduct.id,
-            credits: ipFromServer ? ipFromServer.credits : Number(newProductCredit) || 0,
             product: createdProduct,
             isActive: ipFromServer?.isActive ?? true
           });
@@ -199,7 +151,7 @@ export default function Pricing() {
 
       setCreateProductModal(false);
       setNewProductName("");
-      setNewProductCredit("");
+      setNewProductLicense("");
     } catch (error: any) {
       alert(error.response?.data?.error || "Failed to create product");
     }
@@ -208,42 +160,50 @@ export default function Pricing() {
   // save plan (create or update). Important: include planId when updating
   const handleSavePlan = async () => {
     if (!currentPlan) return alert("No plan to save");
-    if (
-      !currentPlan.planName
-      || !currentPlan.planType
-      || !currentPlan.description.trim()
-      || !currentPlan.basePrice
-      || !currentPlan.validity
-      || !currentPlan.creditsIncluded
-    ) return alert("Plan name required");
+
+    const { planName, planType, description, fixedPrice, basePrice, creditsIncluded, billingCycle, validity } = currentPlan;
+
+    if (!planName || !planType || !description.trim()) {
+      return alert("Please fill required fields.");
+    }
+
+    if (planType === "fixed" && (!fixedPrice || !billingCycle)) {
+      return alert("Please include fixed price and billing cycle.");
+    }
+
+    if (planType === "metered" && (!basePrice || !creditsIncluded || !validity)) {
+      return alert("Please include price, credits, and validity.");
+    }
+
+    if ( planType === "hybrid" && (!fixedPrice || !billingCycle || !basePrice || !creditsIncluded || !validity)) {
+      return alert("Please fill required fields.");
+    }
 
     const payload: any = {
       planType: currentPlan.planType,
       planName: currentPlan.planName,
       description: currentPlan.description,
-      basePrice: Number(currentPlan.basePrice),
+      fixedPrice: currentPlan.planType !== "metered" ? Number(currentPlan.fixedPrice) : null,
+      basePrice: currentPlan.planType !== "fixed" ? Number(currentPlan.basePrice) : null,
       creditsIncluded: Number(currentPlan.creditsIncluded),
-      validity: currentPlan.validity,
-      meteredProducts: currentPlan.meteredProducts.map(mu => ({
+      billingCycle: currentPlan.planType !== "metered" ? currentPlan.billingCycle : null,
+      validity: currentPlan.planType !== "fixed" ? currentPlan.validity : null,
+      includedProducts: currentPlan.planType !== "metered" && currentPlan.includedProducts.map(ip => ({
+        productId: ip.productId,
+        name: ip.product?.name,
+      })),
+      meteredProducts: currentPlan.planType !== "fixed" && currentPlan.meteredProducts.map(mu => ({
         productId: mu.productId,
         name: mu.product?.name,
         credits: Number(mu.credits) || 0
       })),
-      includedProducts: currentPlan.includedProducts.map(ip => ({
-        productId: ip.productId,
-        name: ip.product?.name,
-        credits: Number(ip.credits) || 0
-      })),
     };
-
-    if (currentPlan.planType === "hybrid") {
-      payload.fixedPrice = Number(currentPlan.fixedPrice) || 0;
-    }
 
     // if we're editing existing plan, include planId to update that plan
     if (!isCreatingNew && currentPlan.id) payload.planId = currentPlan.id;
 
     try {
+      console.log(payload);
       const res = await axios.post(`${API}/pricing-plan`, payload);
       const savedPlan = res.data?.plan ?? res.data?.planId ?? null;
 
@@ -321,19 +281,6 @@ export default function Pricing() {
     });
   };
 
-  const updateIncludedCredit = (idx: number, value: string) => {
-    setCurrentPlan(prev => {
-      if (!prev) return prev;
-      const next = {
-        ...prev,
-        includedProducts: prev.includedProducts.map((item, i) =>
-          i === idx ? { ...item, credits: value } : item
-        ),
-      };
-      return next;
-    });
-  };
-
   const deepClonePlan = (p: PricingPlan): PricingPlan => ({
     ...p,
     meteredProducts: p.meteredProducts.map(mp => ({ ...mp })),
@@ -346,17 +293,6 @@ export default function Pricing() {
       setAllProducts(res.data);
     })();
   }, []);
-
-  useEffect(() => {
-    if (!currentPlan) return;
-
-    if (currentPlan.planType !== "hybrid") {
-      setCurrentPlan((prev: any) => ({
-        ...prev!,
-        fixedPrice: ""
-      }))
-    }
-  }, [currentPlan?.planType]);
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -436,8 +372,14 @@ export default function Pricing() {
       </div>
 
       {planEditingModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 space-y-6">
+        <div
+          onClick={() => setPlanEditingModal(false)}
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 space-y-6"
+          >
 
             {/* HEADER */}
             <div className="flex justify-between items-center border-b pb-3">
@@ -490,166 +432,349 @@ export default function Pricing() {
                     />
                   </div>
 
-                  {currentPlan.planType === "hybrid" && (
-                    <div>
-                      <label className="block text-sm font-semibold">Price (Fixed)</label>
-                      <input
-                        className="w-full border px-3 py-2 rounded mt-1"
-                        value={String(currentPlan.fixedPrice ?? "")}
-                        onChange={(e) => updateCurrent({ fixedPrice: e.target.value })}
-                        inputMode="numeric"
-                      />
+                  {/* Fixed and Metered plan */}
+                  {(currentPlan.planType === "fixed" || currentPlan.planType === "metered") && (
+                    <div className="space-y-5">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className={`${currentPlan.planType === "fixed" && "col-span-2"}`}>
+                          <label className="block text-sm font-semibold">
+                            {currentPlan.planType === "fixed"
+                              ? "Fixed Price"
+                              : "Base Price"}
+                          </label>
+                          <input
+                            className="w-full border px-3 py-2 rounded mt-1"
+                            value={String(currentPlan.planType === "fixed" ? currentPlan.fixedPrice : currentPlan.basePrice)}
+                            onChange={(e) => updateCurrent(
+                              currentPlan.planType === "fixed"
+                                ? { fixedPrice: e.target.value }
+                                : { basePrice: e.target.value }
+                              )
+                            }
+                            inputMode="numeric"
+                          />
+                        </div>
+
+                        {currentPlan.planType === "metered" && (
+                          <div>
+                            <label className="block text-sm font-semibold">Credits Included</label>
+                            <input
+                              className="w-full border px-3 py-2 rounded mt-1"
+                              value={String(currentPlan.creditsIncluded ?? "")}
+                              onChange={(e) => updateCurrent({ creditsIncluded: e.target.value })}
+                              inputMode="numeric"
+                            />
+                          </div>
+                        )}
+
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold">
+                          {currentPlan.planType === "fixed"
+                            ? "Billing Cycle (in months)"
+                            : "Validity (in months)"}
+                        </label>
+                        <input
+                          type="number"
+                          className="w-full border px-3 py-2 rounded mt-1"
+                          value={String(currentPlan.planType === "fixed" ? currentPlan.billingCycle : currentPlan.validity)}
+                          onChange={(e) => {
+                            const value = Number(e.target.value);
+                            updateCurrent(
+                              currentPlan.planType === "fixed"
+                                ? { billingCycle: value }
+                                : { validity: value }
+                            );
+                          }}
+                        />
+                      </div>
+
+                      {currentPlan.planType === "fixed" && (
+                        <div className="bg-white p-6 rounded shadow mb-6">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-semibold">All Products</h3>
+                            <button
+                              onClick={() => {
+                                setProductType("included");
+                                setCreateProductModal(true);
+                              }}
+                              className="text-sm px-3 py-1 bg-blue-600 text-white rounded"
+                            >
+                              + Add Product
+                            </button>
+                          </div>
+      
+                          <div className="space-y-3 mb-10">
+                            {availableIncludedProducts.map(prod => (
+                              <div
+                                key={prod.id}
+                                className="flex justify-between p-3 bg-gray-100 rounded cursor-pointer hover:bg-gray-200"
+                                onClick={() => {
+                                  attachProductToPlan(prod, "included");
+                                }}
+                              >
+                                <span className="font-medium">{prod.name}</span>
+                                <button className="px-2 py-1 bg-blue-600 text-white rounded text-xs">
+                                  Add
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+      
+                          {currentPlan.includedProducts?.length === 0 ? (
+                            <p className="text-sm text-gray-500">No  included products yet.</p>
+                          ): (
+                            <div className="space-y-3 mt-5">
+                              <h3 className="font-semibold">Included Products</h3>
+                              <div className="space-y-3">
+                                {currentPlan?.includedProducts?.map((mu, idx) => (
+                                  <div
+                                  key={mu.productId + "-" + idx}
+                                  className="flex items-center justify-between gap-4 bg-gray-50 border rounded-lg p-3"
+                                >
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-semibold text-gray-800">{mu.product?.name}</span>
+                                  </div>
+                                </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {currentPlan.planType === "metered" && (
+                        <div className="bg-white p-6 rounded shadow mb-6">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-semibold">Metered Products</h3>
+                            <button
+                              onClick={() => {
+                                setProductType("metered");
+                                setCreateProductModal(true);
+                              }}
+                              className="text-sm px-3 py-1 bg-blue-600 text-white rounded"
+                            >
+                              + Add Product
+                            </button>
+                          </div>
+
+                          <div className="space-y-3 mb-4">
+                            {availableMeteredProducts.map(prod => (
+                              <div
+                                key={prod.id}
+                                className="flex justify-between p-3 bg-gray-100 rounded cursor-pointer hover:bg-gray-200"
+                                onClick={() => {
+                                  attachProductToPlan(prod, "metered");
+                                }}
+                              >
+                                <span className="font-medium">{prod.name}</span>
+                                <button className="px-2 py-1 bg-blue-600 text-white rounded text-xs">
+                                  Add
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+
+                          {currentPlan.meteredProducts.length === 0 ? (
+                            <p className="text-sm text-gray-500">No metered products yet.</p>
+                          ) : (
+                            <div className="space-y-3">
+                              {currentPlan?.meteredProducts?.map((mu, idx) => (
+                                <div key={mu.productId + "-" + idx} className="flex items-center gap-4">
+                                  <div className="w-1/3">
+                                    <div className="text-sm font-medium">{mu.product?.name}</div>
+                                  </div>
+                                  <div className="flex-1">
+                                    <input
+                                      className="w-full border px-3 py-2 rounded"
+                                      value={String(mu.credits)}
+                                      onChange={(e) => updateMeteredCredit(idx, e.target.value)}
+                                      inputMode="numeric"
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                        </div>
+                      )}
+
                     </div>
                   )}
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold">
-                        {currentPlan.planType === "hybrid"
-                          ? "Top-up Price (Metered)"
-                          : "Base Price"}
-                      </label>
-                      <input
-                        className="w-full border px-3 py-2 rounded mt-1"
-                        value={String(currentPlan.basePrice ?? "")}
-                        onChange={(e) => updateCurrent({ basePrice: e.target.value })}
-                        inputMode="numeric"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold">Credits Included</label>
-                      <input
-                        className="w-full border px-3 py-2 rounded mt-1"
-                        value={String(currentPlan.creditsIncluded ?? "")}
-                        onChange={(e) => updateCurrent({ creditsIncluded: e.target.value })}
-                        inputMode="numeric"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold">Validity (in months)</label>
-                    <input
-                      type="number"
-                      className="w-full border px-3 py-2 rounded mt-1"
-                      value={currentPlan.validity}
-                      onChange={(e) =>
-                        updateCurrent({ validity: Number(e.target.value) })
-                      }
-                    />
-                  </div>
-                </div>
-
-                {/* --- INCLUDED PRODUCTS (HYBRID ONLY) --- */}
-                {currentPlan.planType === "hybrid" && (
-                  <div className="bg-white p-6 rounded shadow mb-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-semibold">Included Products</h3>
-                      <button
-                        onClick={() => {
-                          setProductType("included");
-                          setCreateProductModal(true);
-                        }}
-                        className="text-sm px-3 py-1 bg-blue-600 text-white rounded"
-                      >
-                        + Add Product
-                      </button>
-                    </div>
-
-                    <div className="space-y-3 mb-4">
-                      {availableIncludedProducts.map(prod => (
-                        <div
-                          key={prod.id}
-                          className="flex justify-between p-3 bg-gray-100 rounded cursor-pointer hover:bg-gray-200"
-                          onClick={() => {
-                            attachProductToPlan(prod, "included");
-                          }}
-                        >
-                          <span className="font-medium">{prod.name}</span>
-                          <button className="px-2 py-1 bg-blue-600 text-white rounded text-xs">
-                            Add
-                          </button>
+                  {/* Hybrid plan */}
+                  {currentPlan.planType === "hybrid" && (
+                    <div className="grid grid-cols-2 gap-5 mt-5">
+                      {/* Fixed */}
+                      <div className="space-y-5 border-r pr-5">
+                        <h3 className="text-lg font-semibold text-blue-600">Fixed Plan Details</h3>
+                        <div>
+                          <label className="block text-sm font-semibold">Fixed Price</label>
+                          <input
+                            className="w-full border px-3 py-2 rounded mt-1"
+                            value={String(currentPlan.fixedPrice ?? "")}
+                            onChange={(e) => updateCurrent({ fixedPrice: e.target.value })}
+                            inputMode="numeric"
+                          />
                         </div>
-                      ))}
-                    </div>
-
-                    {currentPlan.includedProducts?.length === 0 && (
-                      <p className="text-sm text-gray-500">No  included products yet.</p>
-                    )}
-
-                    <div className="space-y-3">
-                      {currentPlan?.includedProducts?.map((mu, idx) => (
-                        <div key={mu.productId + "-" + idx} className="flex items-center gap-4">
-                          <div className="w-1/3">
-                            <div className="text-sm font-medium">{mu.product?.name}</div>
+                        <div>
+                          <label className="block text-sm font-semibold">Billing Cycle (in months)</label>
+                          <input
+                            type="number"
+                            className="w-full border px-3 py-2 rounded mt-1"
+                            value={String(currentPlan.billingCycle)}
+                            onChange={(e) =>
+                              updateCurrent({ billingCycle: Number(e.target.value) })
+                            }
+                          />
+                        </div>
+                        <div className="bg-white p-6 rounded shadow mb-4">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-semibold">Included Products</h3>
+                            <button
+                              onClick={() => {
+                                setProductType("included");
+                                setCreateProductModal(true);
+                              }}
+                              className="text-sm px-3 py-1 bg-blue-600 text-white rounded"
+                            >
+                              + Add Product
+                            </button>
                           </div>
-                          <div className="flex-1">
+      
+                          <div className="space-y-3 mb-4">
+                            {availableIncludedProducts.map(prod => (
+                              <div
+                                key={prod.id}
+                                className="flex justify-between p-3 bg-gray-100 rounded cursor-pointer hover:bg-gray-200"
+                                onClick={() => {
+                                  attachProductToPlan(prod, "included");
+                                }}
+                              >
+                                <span className="font-medium">{prod.name}</span>
+                                <button className="px-2 py-1 bg-blue-600 text-white rounded text-xs">
+                                  Add
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+      
+                          {currentPlan.includedProducts?.length === 0 ? (
+                            <p className="text-sm text-gray-500">No  included products yet.</p>
+                          ): (
+                            <div className="space-y-3 mt-5">
+                              <h3 className="font-semibold">Included Products</h3>
+                              <div className="space-y-3">
+                                {currentPlan?.includedProducts?.map((mu, idx) => (
+                                  <div
+                                  key={mu.productId + "-" + idx}
+                                  className="flex items-center justify-between gap-4 bg-gray-50 border rounded-lg p-3"
+                                >
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-semibold text-gray-800">{mu.product?.name}</span>
+                                  </div>
+                                </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+      
+                        </div>
+                      </div>
+                      {/* Metered */}
+                      <div className="space-y-5">
+                        <h3 className="text-lg font-semibold text-blue-600">Metered Plan Details</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-semibold">Base Price</label>
                             <input
-                              className="w-full border px-3 py-2 rounded"
-                              value={String(mu.credits)}
-                              onChange={(e) => updateIncludedCredit(idx, e.target.value)}
+                              className="w-full border px-3 py-2 rounded mt-1"
+                              value={String(currentPlan.basePrice ?? "")}
+                              onChange={(e) => updateCurrent({ basePrice: e.target.value })}
+                              inputMode="numeric"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold">Credits Included</label>
+                            <input
+                              className="w-full border px-3 py-2 rounded mt-1"
+                              value={String(currentPlan.creditsIncluded ?? "")}
+                              onChange={(e) => updateCurrent({ creditsIncluded: e.target.value })}
                               inputMode="numeric"
                             />
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                <div className="bg-white p-6 rounded shadow mb-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold">Metered Products</h3>
-                    <button
-                      onClick={() => {
-                        setProductType("metered");
-                        setCreateProductModal(true);
-                      }}
-                      className="text-sm px-3 py-1 bg-blue-600 text-white rounded"
-                    >
-                      + Add Product
-                    </button>
-                  </div>
-
-                  <div className="space-y-3 mb-4">
-                    {availableMeteredProducts.map(prod => (
-                      <div
-                        key={prod.id}
-                        className="flex justify-between p-3 bg-gray-100 rounded cursor-pointer hover:bg-gray-200"
-                        onClick={() => {
-                          attachProductToPlan(prod, "metered");
-                        }}
-                      >
-                        <span className="font-medium">{prod.name}</span>
-                        <button className="px-2 py-1 bg-blue-600 text-white rounded text-xs">
-                          Add
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
-                  {currentPlan.meteredProducts.length === 0 && (
-                    <p className="text-sm text-gray-500">No metered products yet.</p>
-                  )}
-
-                  <div className="space-y-3">
-                    {currentPlan?.meteredProducts?.map((mu, idx) => (
-                      <div key={mu.productId + "-" + idx} className="flex items-center gap-4">
-                        <div className="w-1/3">
-                          <div className="text-sm font-medium">{mu.product?.name}</div>
-                        </div>
-                        <div className="flex-1">
+                        <div>
+                          <label className="block text-sm font-semibold">Validity (in months)</label>
                           <input
-                            className="w-full border px-3 py-2 rounded"
-                            value={String(mu.credits)}
-                            onChange={(e) => updateMeteredCredit(idx, e.target.value)}
-                            inputMode="numeric"
+                            type="number"
+                            className="w-full border px-3 py-2 rounded mt-1"
+                            value={String(currentPlan.validity)}
+                            onChange={(e) =>
+                              updateCurrent({ validity: Number(e.target.value) })
+                            }
                           />
                         </div>
+                        <div className="bg-white p-6 rounded shadow mb-4">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-semibold">Metered Products</h3>
+                            <button
+                              onClick={() => {
+                                setProductType("metered");
+                                setCreateProductModal(true);
+                              }}
+                              className="text-sm px-3 py-1 bg-blue-600 text-white rounded"
+                            >
+                              + Add Product
+                            </button>
+                          </div>
+
+                          <div className="space-y-3 mb-4">
+                            {availableMeteredProducts.map(prod => (
+                              <div
+                                key={prod.id}
+                                className="flex justify-between p-3 bg-gray-100 rounded cursor-pointer hover:bg-gray-200"
+                                onClick={() => {
+                                  attachProductToPlan(prod, "metered");
+                                }}
+                              >
+                                <span className="font-medium">{prod.name}</span>
+                                <button className="px-2 py-1 bg-blue-600 text-white rounded text-xs">
+                                  Add
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+
+                          {currentPlan.meteredProducts.length === 0 ? (
+                            <p className="text-sm text-gray-500">No metered products yet.</p>
+                          ): (
+                            <div className="space-y-3">
+                              {currentPlan?.meteredProducts?.map((mu, idx) => (
+                                <div key={mu.productId + "-" + idx} className="flex items-center gap-4">
+                                  <div className="w-1/3">
+                                    <div className="text-sm font-medium">{mu.product?.name}</div>
+                                  </div>
+                                  <div className="flex-1">
+                                    <input
+                                      className="w-full border px-3 py-2 rounded"
+                                      value={String(mu.credits)}
+                                      onChange={(e) => updateMeteredCredit(idx, e.target.value)}
+                                      inputMode="numeric"
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  )}
+
                 </div>
 
                 {/* BUTTONS */}
@@ -675,10 +800,15 @@ export default function Pricing() {
         </div>
       )}
 
-      {/* Create Product Modal */}
       {createProductModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded shadow w-full max-w-md">
+        <div
+          onClick={() => setCreateProductModal(false)}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white p-6 rounded shadow w-full max-w-md"
+          >
             <h3 className="font-semibold mb-3">Create Product</h3>
 
             <label className="block text-sm font-medium">Name</label>
@@ -686,15 +816,14 @@ export default function Pricing() {
               className="w-full border px-3 py-2 rounded mt-1 mb-3"
               value={newProductName}
               onChange={(e) => setNewProductName(e.target.value)}
-              placeholder="WhatsApp"
+              placeholder="e.g. WhatsApp"
             />
 
-            <label className="block text-sm font-medium">Credit (optional)</label>
+            <label className="block text-sm font-medium">License number (optional)</label>
             <input
               className="w-full border px-3 py-2 rounded mt-1 mb-4"
-              value={newProductCredit}
-              onChange={(e) => setNewProductCredit(e.target.value)}
-              placeholder="e.g. 1.5"
+              value={newProductLicense}
+              onChange={(e) => setNewProductLicense(e.target.value)}
             />
 
             <div className="flex gap-3 justify-end">
@@ -703,7 +832,7 @@ export default function Pricing() {
                 onClick={() => {
                   setCreateProductModal(false);
                   setNewProductName("");
-                  setNewProductCredit("");
+                  setNewProductLicense("");
                 }}
               >
                 Cancel

@@ -46,8 +46,6 @@ const API = process.env.NEXT_PUBLIC_API_URL;
 
 export default function Customers({ onDone }: { onDone: () => void }) {
 
-  const router = useRouter();
-
   const [restaurants, setRestaurants] = useState([]);
   const [allPlans, setAllPlans] = useState<PricingPlan[]>([]);
   const [planEditingModal, setPlanEditingModal] = useState(false);
@@ -66,7 +64,6 @@ export default function Customers({ onDone }: { onDone: () => void }) {
     return "customers";
   });
   const [paymentFile, setPaymentFile] = useState<File | null>(null);
-  const [updating, setUpdating] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
   const [startDate, setStartDate] = useState(() => {
@@ -89,6 +86,10 @@ export default function Customers({ onDone }: { onDone: () => void }) {
   const [isPartial, setIsPartial] = useState("No");
   const [partialAmount, setPartialAmount] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [assigningPlan, setAssigningPlan] = useState(false);
+  const [updatingTaxSettings, setUpdatingTaxSettings] = useState(false);
+  const [updatingPayment, setUpdatingPayment] = useState(false);
+  const [assigningPlanId, setAssigningPlanId] = useState<number | null>(null);
 
   async function selectRestaurant(restaurantId: any) {
     setCurrentPlan(undefined);
@@ -116,6 +117,8 @@ export default function Customers({ onDone }: { onDone: () => void }) {
       setConfirmAssigned(true);
       return;
     }
+    setAssigningPlanId(pricingPlanId);
+    setAssigningPlan(true);
     const payload = {
       restaurantId,
       pricingPlanId,
@@ -133,6 +136,8 @@ export default function Customers({ onDone }: { onDone: () => void }) {
       console.error(err);
     } finally {
       setConfirmAssigned(false);
+      setAssigningPlan(false);
+      setAssigningPlanId(null);
     }
   }
 
@@ -141,6 +146,7 @@ export default function Customers({ onDone }: { onDone: () => void }) {
     if (!planMode) return alert("Please include plan mode.");
     if (planMode === "trial" && !trialDays) return alert("Please include trial days.");
     if (!currentPlan) return alert("No plan assigned on this business.");
+    setUpdatingTaxSettings(true);
     const payload = {
       restaurantId,
       pricingPlanId: currentPlan?.id,
@@ -156,6 +162,8 @@ export default function Customers({ onDone }: { onDone: () => void }) {
       window.location.reload();
     } catch (err) {
       console.error(err);
+    } finally {
+      setUpdatingTaxSettings(false);
     }
   }
 
@@ -164,8 +172,12 @@ export default function Customers({ onDone }: { onDone: () => void }) {
       setError("Payment date is required!");
       return;
     }
+    if (!paymentFile) {
+      setError("Payment file is required!");
+      return;
+    }
 
-    setUpdating(true);
+    setUpdatingPayment(true);
   
     try {
       let uploadedUrl = null;
@@ -202,13 +214,14 @@ export default function Customers({ onDone }: { onDone: () => void }) {
       console.error(err);
       setError("Upload failed. Try again.");
     } finally {
-      setUpdating(false);
+      setUpdatingPayment(false);
     }
   }
 
   useEffect(() => {
     axios.get(`${API}/restaurant`).then((res) => {
       setRestaurants(res.data);
+      console.log(res.data);
       const paid = res.data?.filter((res: any) => res.invoices.length > 0 &&  res.invoices.at(-1).status === "paid");
       const unpaid = res.data?.filter((res: any) => 
         res.invoices.length > 0 &&  res.invoices.at(-1).status === "pending" ||
@@ -382,12 +395,14 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                           </div>
     
                           <div className="flex flex-col gap-2">
-                            <button
-                              onClick={() => router.push(`/proforma-invoice/${r.id}`)}
+                            <Link
+                              href={`/invoice/${r.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
                             >
                               Invoice
-                            </button>
+                            </Link>
                             <button
                               onClick={() => {
                                 serCurrentResId(r.id)
@@ -410,32 +425,6 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                             ) : "-"}
                           </div>
                         </td>
-    
-                        {/* PAID */}
-                        {/* <td className="p-1 border-r text-center leading-5">
-                          {r.invoices?.[r.invoices.length - 1]?.status === "pending" ? "-" : (
-                            <div>
-                              <div className="font-medium">Paid on</div>
-                              <div className="text-gray-700">{r.invoices.at(-1)?.paymentDate?.split("T")[0]}</div>
-                              <div className="text-xs text-gray-500 italic">Tax Invoice</div>
-                              {r.invoices.at(-1)?.paymentFileUrl && (
-                                <Link
-                                  href={r.invoices.at(-1)?.paymentFileUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 text-xs font-medium underline hover:text-blue-800 transition"
-                                >
-                                  View Receipt
-                                </Link>
-                              )}
-                              {r.invoices.at(-1)?.paymentNotes && (
-                                <p className="text-gray-600 text-xs italic mt-1">
-                                  {r.invoices.at(-1).paymentNotes}
-                                </p>
-                              )}
-                            </div>
-                          )}
-                        </td> */}
 
                         <td className="p-4 border-r text-center leading-5">
 
@@ -467,12 +456,19 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                                       className="bg-orange-50 border border-orange-200 rounded p-2 text-xs shadow-sm"
                                     >
                                       <div className="font-medium text-orange-700">
-                                        Paid: ₹{inv.partialAmount}/-
+                                        Partially Paid: ₹{inv.partialAmount}/-
                                       </div>
 
                                       <div className="text-gray-700">
                                         Date: {inv.paymentDate?.split("T")[0]}
                                       </div>
+
+                                      {/* Notes */}
+                                      {inv.paymentNotes && (
+                                        <div className="text-gray-600 italic mt-1">
+                                          {inv.paymentNotes}
+                                        </div>
+                                      )}
 
                                       {/* Remaining Amount */}
                                       {inv.remainingAmount !== null && (
@@ -484,24 +480,29 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                                         </div>
                                       )}
 
-                                      {/* Receipt link */}
-                                      {inv.paymentFileUrl && (
+                                      <div className="flex flex-col items-center justify-center mt-1">
+                                        {/* Receipt link (secondary) */}
+                                        {inv.paymentFileUrl && (
+                                          <Link
+                                            href={inv.paymentFileUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-gray-600 text-sm underline hover:text-gray-800 transition"
+                                          >
+                                            📄 View Receipt
+                                          </Link>
+                                        )}
+                                        {/* Invoice link (primary) */}
                                         <Link
-                                          href={inv.paymentFileUrl}
+                                          href={`/invoice/${r.id}/specific/${inv.id}`}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="text-blue-600 underline block mt-1 font-medium"
+                                          className="mt-2 inline-block px-2 py-1 rounded-md bg-blue-600 text-white text-xs font-medium shadow hover:bg-blue-700 transition"
                                         >
-                                          View Receipt
+                                          View Invoice →
                                         </Link>
-                                      )}
+                                      </div>
 
-                                      {/* Notes */}
-                                      {inv.paymentNotes && (
-                                        <div className="text-gray-600 italic mt-1">
-                                          {inv.paymentNotes}
-                                        </div>
-                                      )}
                                     </div>
                                   ))}
 
@@ -662,12 +663,14 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                           </div>
 
                           <div className="flex flex-col gap-2">
-                            <button
-                              onClick={() => router.push(`/proforma-invoice/${r.id}`)}
+                            <Link
+                              href={`/invoice/${r.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
                             >
                               Invoice
-                            </button>
+                            </Link>
                             <button
                               onClick={() => {
                                 serCurrentResId(r.id)
@@ -745,6 +748,13 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                                         Date: {inv.paymentDate?.split("T")[0]}
                                       </div>
 
+                                      {/* Notes */}
+                                      {inv.paymentNotes && (
+                                        <div className="text-gray-600 italic mt-1">
+                                          {inv.paymentNotes}
+                                        </div>
+                                      )}
+
                                       {/* Remaining Amount */}
                                       {inv.remainingAmount !== null && (
                                         <div
@@ -755,24 +765,28 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                                         </div>
                                       )}
 
-                                      {/* Receipt link */}
-                                      {inv.paymentFileUrl && (
+                                      <div className="flex flex-col items-center justify-center mt-1">
+                                        {/* Receipt link (secondary) */}
+                                        {inv.paymentFileUrl && (
+                                          <Link
+                                            href={inv.paymentFileUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-gray-600 text-sm underline hover:text-gray-800 transition"
+                                          >
+                                            📄 View Receipt
+                                          </Link>
+                                        )}
+                                        {/* Invoice link (primary) */}
                                         <Link
-                                          href={inv.paymentFileUrl}
+                                          href={`/invoice/${r.id}/specific/${inv.id}`}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="text-blue-600 underline block mt-1 font-medium"
+                                          className="mt-2 inline-block px-2 py-1 rounded-md bg-blue-600 text-white text-xs font-medium shadow hover:bg-blue-700 transition"
                                         >
-                                          View Receipt
+                                          View Invoice →
                                         </Link>
-                                      )}
-
-                                      {/* Notes */}
-                                      {inv.paymentNotes && (
-                                        <div className="text-gray-600 italic mt-1">
-                                          {inv.paymentNotes}
-                                        </div>
-                                      )}
+                                      </div>
                                     </div>
                                   ))}
 
@@ -940,12 +954,14 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                           </div>
 
                           <div className="flex flex-col gap-2">
-                            <button
-                              onClick={() => router.push(`/proforma-invoice/${r.id}`)}
+                            <Link
+                              href={`/invoice/${r.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
                             >
                               Invoice
-                            </button>
+                            </Link>
                             <button
                               onClick={() => {
                                 serCurrentResId(r.id)
@@ -1019,12 +1035,19 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                                       className="bg-orange-50 border border-orange-200 rounded p-2 text-xs shadow-sm"
                                     >
                                       <div className="font-medium text-orange-700">
-                                        Paid: ₹{inv.partialAmount}/-
+                                        Partially paid: ₹{inv.partialAmount}/-
                                       </div>
 
                                       <div className="text-gray-700">
                                         Date: {inv.paymentDate?.split("T")[0]}
                                       </div>
+
+                                      {/* Notes */}
+                                      {inv.paymentNotes && (
+                                        <div className="text-gray-600 italic mt-1">
+                                          {inv.paymentNotes}
+                                        </div>
+                                      )}
 
                                       {/* Remaining Amount */}
                                       {inv.remainingAmount !== null && (
@@ -1036,24 +1059,29 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                                         </div>
                                       )}
 
-                                      {/* Receipt link */}
-                                      {inv.paymentFileUrl && (
+                                      <div className="flex flex-col items-center justify-center mt-1">
+                                        {/* Receipt link (secondary) */}
+                                        {inv.paymentFileUrl && (
+                                          <Link
+                                            href={inv.paymentFileUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-gray-600 text-sm underline hover:text-gray-800 transition"
+                                          >
+                                            📄 View Receipt
+                                          </Link>
+                                        )}
+                                        {/* Invoice link (primary) */}
                                         <Link
-                                          href={inv.paymentFileUrl}
+                                          href={`/invoice/${r.id}/specific/${inv.id}`}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="text-blue-600 underline block mt-1 font-medium"
+                                          className="mt-2 inline-block px-2 py-1 rounded-md bg-blue-600 text-white text-xs font-medium shadow hover:bg-blue-700 transition"
                                         >
-                                          View Receipt
+                                          View Invoice →
                                         </Link>
-                                      )}
+                                      </div>
 
-                                      {/* Notes */}
-                                      {inv.paymentNotes && (
-                                        <div className="text-gray-600 italic mt-1">
-                                          {inv.paymentNotes}
-                                        </div>
-                                      )}
                                     </div>
                                   ))}
 
@@ -1118,8 +1146,14 @@ export default function Customers({ onDone }: { onDone: () => void }) {
         </div>
       </div>
       {planEditingModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 space-y-6">
+        <div
+          onClick={() => setPlanEditingModal(false)}
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 space-y-6"
+          >
 
             {/* HEADER */}
             <div className="flex items-center justify-between">
@@ -1376,11 +1410,25 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                   Cancel
                 </button>
                 <button
-                  className="px-4 py-2 text-sm rounded-md bg-sky-600 text-white shadow
-                  hover:bg-sky-700 focus:ring-2 focus:ring-sky-400 transition-all"
+                  disabled={updatingTaxSettings}
                   onClick={() => handleUpdateTaxSettings(selectedRestaurant?.id)}
+                  className={`
+                    relative px-4 py-2 text-sm rounded-md font-medium
+                    transition-all duration-200
+                    ${updatingTaxSettings
+                      ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                      : "bg-sky-600 text-white shadow hover:bg-sky-700 focus:ring-2 focus:ring-sky-400"
+                    }
+                  `}
                 >
-                  Update
+                  {updatingTaxSettings ? (
+                    <span className="flex items-center gap-2">
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      Updating…
+                    </span>
+                  ) : (
+                    "Update"
+                  )}
                 </button>
               </div>
             </div>
@@ -1432,19 +1480,30 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                     </div>
                   </div>
 
-                  <div className="mt-4 flex gap-2">
+                  <div className="mt-4 flex gap-2">                    
                     <button
                       onClick={() => handleAssignPlan(selectedRestaurant?.id, plan.id)}
-                      disabled={currentPlan && currentPlan.id === plan.id}
+                      disabled={(currentPlan && currentPlan.id === plan.id) || assigningPlan}
                       className={`
                         flex-1 py-2 rounded text-sm font-medium transition
                         ${currentPlan && currentPlan.id === plan.id 
                           ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                          : (assigningPlan && assigningPlanId === plan.id) 
+                          ? "text-white bg-green-700 cursor-not-allowed"
                           : "bg-green-600 text-white hover:bg-green-700 cursor-pointer"
                         }
                       `}
                     >
-                      {currentPlan && currentPlan.id === plan.id ? "Already Assigned" : "Assign This Plan"}
+                      {assigningPlan && assigningPlanId === plan.id ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                          Updating…
+                        </span>
+                      ) : currentPlan && currentPlan.id === plan.id ? (
+                        <span>Already Assigned</span>
+                      ) : (
+                        <span>Assign This Plan</span>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -1460,8 +1519,14 @@ export default function Customers({ onDone }: { onDone: () => void }) {
         </div>
       )}
       {updatePayment && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 space-y-6">
+        <div
+          onClick={() => setUpdatePayment(false)}
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 space-y-6"
+          >
             <div className="flex flex-col gap-6 w-full p-6 rounded-lg shadow-sm border border-gray-200">
 
               {error && (
@@ -1491,34 +1556,50 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                 />
               </div>
 
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-gray-700">Is Payment Partially Done?</label>
-                <select
-                  value={isPartial}
-                  onChange={(e) => setIsPartial(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50 focus:bg-white
-                  focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none cursor-pointer transition-all"
-                >
-                  <option value="No">No</option>
-                  <option value="Yes">Yes</option>
-                </select>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-gray-700">Payment Status</label>
+                <div className="flex items-center gap-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="paymentStatus"
+                      value="full"
+                      checked={isPartial === "No"}
+                      onChange={() => setIsPartial("No")}
+                      className="cursor-pointer"
+                    />
+                    <span className="text-sm">Fully Paid</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="paymentStatus"
+                      value="partial"
+                      checked={isPartial === "Yes"}
+                      onChange={() => setIsPartial("Yes")}
+                      className="cursor-pointer"
+                    />
+                    <span className="text-sm">Partially Paid</span>
+                  </label>
+                </div>
+                {isPartial === "Yes" && (
+                  <div className="flex flex-col gap-1 mt-1">
+                    <label className="text-sm font-medium text-gray-700">Partial Payment Amount</label>
+                    <input
+                      type="number"
+                      min={1}
+                      className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50 focus:bg-white
+                      focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
+                      value={partialAmount ?? ""}
+                      onChange={(e) => setPartialAmount(Number(e.target.value))}
+                      placeholder="Enter partial payment amount"
+                      required
+                    />
+                  </div>
+                )}
               </div>
 
-              {isPartial === "Yes" && (
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-medium text-gray-700">Partial Payment Amount (₹)</label>
-                  <input
-                    type="number"
-                    min={1}
-                    className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50 focus:bg-white
-                    focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
-                    value={partialAmount ?? ""}
-                    onChange={(e) => setPartialAmount(Number(e.target.value))}
-                    placeholder="Enter partial payment amount"
-                    required
-                  />
-                </div>
-              )}
 
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium text-gray-700">Upload Payment Proof</label>
@@ -1546,18 +1627,18 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                 </button>
 
                 <button
-                  disabled={updating}
+                  disabled={updatingPayment}
                   onClick={handleUpdatePayment}
                   className={`
                     relative px-4 py-2 text-sm rounded-md font-medium
                     transition-all duration-200
-                    ${updating
+                    ${updatingPayment
                       ? "bg-gray-300 text-gray-600 cursor-not-allowed"
                       : "bg-sky-600 text-white shadow hover:bg-sky-700 focus:ring-2 focus:ring-sky-400"
                     }
                   `}
                 >
-                  {updating ? (
+                  {updatingPayment ? (
                     <span className="flex items-center gap-2">
                       <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                       Updating…

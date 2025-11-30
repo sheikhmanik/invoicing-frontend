@@ -109,8 +109,14 @@ export default function SelectBrand({ business, onBack, onSelect }: any) {
 
       {/* ====== MODAL ====== */}
       {showAddBrand && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3">
-          <div className="bg-white w-full max-w-lg rounded-xl shadow-lg p-6 relative animate-fadeIn">
+        <div
+          onClick={() => setShowAddBrand(false)}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white w-full max-w-lg rounded-xl shadow-lg p-6 relative animate-fadeIn"
+          >
 
             {/* Close Button */}
             <button
