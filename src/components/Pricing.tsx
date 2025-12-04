@@ -8,6 +8,7 @@ interface Product {
   id: number;
   name: string;
   createdAt?: string;
+  license?: string;
 }
 
 interface MeteredProduct {
@@ -55,6 +56,7 @@ export default function Pricing() {
 
   const [newProductName, setNewProductName] = useState("");
   const [newProductLicense, setNewProductLicense] = useState("");
+  const [error, setError] = useState("");
 
   const emptyPlan = (): PricingPlan => ({
     planType: "fixed",
@@ -74,7 +76,6 @@ export default function Pricing() {
     try {
       const res = await axios.get<PricingPlan[]>(`${API}/pricing-plan`);
       setAllPlans(res.data || []);
-      console.log(res.data);
       if (!currentPlan && res.data && res.data.length > 0) {
         setCurrentPlan(res.data[0]);
         setIsCreatingNew(false);
@@ -109,7 +110,10 @@ export default function Pricing() {
 
   // add product modal handler: create product and (optionally) attach to metered plan
   const handleCreateProduct = async () => {
-    if (!newProductName.trim()) return alert("Product name required");
+    if (!newProductName.trim()) {
+      setError("Product name is required.");
+      return;
+    }
     try {
       const payload: any = { name: newProductName };
       if (newProductLicense !== "") payload.license = newProductLicense;
@@ -153,7 +157,13 @@ export default function Pricing() {
       setNewProductName("");
       setNewProductLicense("");
     } catch (error: any) {
-      alert(error.response?.data?.error || "Failed to create product");
+      console.log("Create product error:", error.response?.data || error);
+      alert(
+        error.response?.data?.error ||
+        error.response?.data?.detail || // show server detail if present
+        error.message ||
+        "Failed to create product"
+      );
     }
   };
 
@@ -163,7 +173,7 @@ export default function Pricing() {
 
     const { planName, planType, description, fixedPrice, basePrice, creditsIncluded, billingCycle, validity } = currentPlan;
 
-    if (!planName || !planType || !description.trim()) {
+    if (!planName || !planType) {
       return alert("Please fill required fields.");
     }
 
@@ -188,22 +198,27 @@ export default function Pricing() {
       creditsIncluded: Number(currentPlan.creditsIncluded),
       billingCycle: currentPlan.planType !== "metered" ? currentPlan.billingCycle : null,
       validity: currentPlan.planType !== "fixed" ? currentPlan.validity : null,
-      includedProducts: currentPlan.planType !== "metered" && currentPlan.includedProducts.map(ip => ({
-        productId: ip.productId,
-        name: ip.product?.name,
-      })),
-      meteredProducts: currentPlan.planType !== "fixed" && currentPlan.meteredProducts.map(mu => ({
-        productId: mu.productId,
-        name: mu.product?.name,
-        credits: Number(mu.credits) || 0
-      })),
+      includedProducts:
+        currentPlan.planType !== "metered"
+          ? currentPlan.includedProducts.map(ip => ({
+              productId: ip.productId,
+              license: ip.product?.license ?? null,
+            }))
+          : [],
+      meteredProducts:
+        currentPlan.planType !== "fixed"
+          ? currentPlan.meteredProducts.map(mu => ({
+              productId: mu.productId,
+              credits: Number(mu.credits) ?? 0,
+              license: mu.product?.license ?? null,
+            }))
+          : [],
     };
 
     // if we're editing existing plan, include planId to update that plan
     if (!isCreatingNew && currentPlan.id) payload.planId = currentPlan.id;
 
     try {
-      console.log(payload);
       const res = await axios.post(`${API}/pricing-plan`, payload);
       const savedPlan = res.data?.plan ?? res.data?.planId ?? null;
 
@@ -217,8 +232,9 @@ export default function Pricing() {
         const byName = allPlans.find(p => p.planName === payload.planName);
         if (byName) setCurrentPlan(byName);
       }
-      alert("Plan saved.");
+      alert("Plan saved!");
       setPlanEditingModal(false);
+      window.location.reload();
     } catch (err) {
       console.error("Failed to save plan", err);
       alert("Failed to save plan");
@@ -332,40 +348,69 @@ export default function Pricing() {
             <table className="min-w-full border-collapse text-left">
               <thead className="sticky top-0 bg-gray-100 z-10">
                 <tr className="bg-gray-100 border-b">
-                  <th className="p-3 text-start font-semibold text-gray-700">Plan Name</th>
-                  <th className="p-3 text-start font-semibold text-gray-700">Plan Type</th>
-                  <th className="p-3 text-start font-semibold text-gray-700">Description</th>
-                  <th className="p-3 text-start font-semibold text-gray-700">Price</th>
-                  <th className="p-3 text-start font-semibold text-gray-700">Credits</th>
+                  <th className="p-3 font-semibold text-gray-700">Plan Name</th>
+                  <th className="p-3 font-semibold text-gray-700">Plan Type</th>
+                  <th className="p-3 font-semibold text-gray-700">Description</th>
+                  <th className="p-3 font-semibold text-gray-700">Price</th>
+                  <th className="p-3 font-semibold text-gray-700">Credits</th>
                 </tr>
               </thead>
+
               <tbody>
-                {allPlans.map((plan: any) => (
-                  <tr key={plan.id} className="border-b hover:bg-gray-50">
-                    <td className="p-3 text-start">
-                      <div className="flex items-center gap-1">
-                        <a
-                          className="text-blue-700 cursor-pointer"
-                          onClick={() => {
-                            setPlanEditingModal(true);
-                            onSelectPlan(plan.id);
-                          }}
-                        >
-                          <SquarePen size={16} />
-                        </a>
-                        <p>{plan.planName}</p>
-                      </div>
-                    </td>
-                    <td className="p-3 text-start capitalize">{plan.planType}</td>
-                    <td className="p-3 text-start text-gray-600">{plan.description || "—"}</td>
-                    <td className="p-3 text-start">₹ {plan.basePrice}</td>
-                    <td className="p-3 text-start">{plan.creditsIncluded}</td>
-                  </tr>
-                ))}
+                {allPlans.map((plan: any) => {
+                  const isFixed = plan.planType === "fixed";
+                  const isMetered = plan.planType === "metered";
+                  const isHybrid = plan.planType === "hybrid";
+
+                  const priceDisplay = isFixed
+                    ? `₹ ${plan.fixedPrice}`
+                    : isMetered
+                    ? `₹ ${plan.basePrice}`
+                    : isHybrid
+                    ? `₹ ${plan.fixedPrice} + ₹ ${plan.basePrice}`
+                    : "—";
+
+                  const creditsDisplay = isMetered || isHybrid
+                    ? plan.creditsIncluded ?? "—"
+                    : "—";
+
+                  return (
+                    <tr key={plan.id} className="border-b hover:bg-gray-50">
+                      <td className="p-3">
+                        <div className="flex items-center gap-1">
+                          <button
+                            className="text-blue-700 hover:underline"
+                            onClick={() => {
+                              setPlanEditingModal(true);
+                              onSelectPlan(plan.id);
+                            }}
+                          >
+                            <SquarePen size={16} />
+                          </button>
+                          <p className="font-medium">{plan.planName}</p>
+                        </div>
+                      </td>
+
+                      <td className="p-3 capitalize text-gray-800">{plan.planType}</td>
+
+                      <td className="p-3 text-gray-600">
+                        {plan.description || "—"}
+                      </td>
+
+                      <td className="p-3 font-semibold text-gray-800">
+                        {priceDisplay}
+                      </td>
+
+                      <td className="p-3 text-gray-800">
+                        {creditsDisplay}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           ) : (
-            <p>No plans created.</p>
+            <p className="text-gray-500">No plans created.</p>
           )}
         </div>
 
@@ -398,7 +443,12 @@ export default function Pricing() {
                 {/* --- BASIC INFO SECTION --- */}
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-semibold">Plan Type</label>
+                    <label className="text-sm font-medium text-gray-700">
+                      Plan Type
+                      <span className="ml-1 text-xs text-blue-600 font-normal">
+                        (required)
+                      </span>
+                    </label>
                     <div className="flex gap-4 mt-2">
                       {["fixed", "metered", "hybrid"].map(type => (
                         <label key={type} className="flex items-center gap-2">
@@ -414,7 +464,12 @@ export default function Pricing() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold">Plan Name</label>
+                    <label className="text-sm font-medium text-gray-700">
+                      Plan Name
+                      <span className="ml-1 text-xs text-blue-600 font-normal">
+                        (required)
+                      </span>
+                    </label>
                     <input
                       className="w-full border px-3 py-2 rounded mt-1"
                       value={currentPlan.planName}
@@ -423,7 +478,13 @@ export default function Pricing() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold">Description</label>
+                    <label className="block text-sm font-semibold"></label>
+                    <label className="text-sm font-medium text-gray-700">
+                      Description
+                      <span className="ml-1 text-xs text-blue-600 font-normal">
+                        (optional)
+                      </span>
+                    </label>
                     <textarea
                       className="w-full border px-3 py-2 rounded mt-1"
                       rows={3}
@@ -441,6 +502,9 @@ export default function Pricing() {
                             {currentPlan.planType === "fixed"
                               ? "Fixed Price"
                               : "Base Price"}
+                              <span className="ml-1 text-xs text-blue-600 font-normal">
+                                (required)
+                              </span>
                           </label>
                           <input
                             className="w-full border px-3 py-2 rounded mt-1"
@@ -457,7 +521,12 @@ export default function Pricing() {
 
                         {currentPlan.planType === "metered" && (
                           <div>
-                            <label className="block text-sm font-semibold">Credits Included</label>
+                            <label className="text-sm font-medium text-gray-700">
+                              Credits Included
+                              <span className="ml-1 text-xs text-blue-600 font-normal">
+                                (required)
+                              </span>
+                            </label>
                             <input
                               className="w-full border px-3 py-2 rounded mt-1"
                               value={String(currentPlan.creditsIncluded ?? "")}
@@ -474,6 +543,9 @@ export default function Pricing() {
                           {currentPlan.planType === "fixed"
                             ? "Billing Cycle (in months)"
                             : "Validity (in months)"}
+                            <span className="ml-1 text-xs text-blue-600 font-normal">
+                              (required)
+                            </span>
                         </label>
                         <input
                           type="number"
@@ -509,15 +581,17 @@ export default function Pricing() {
                             {availableIncludedProducts.map(prod => (
                               <div
                                 key={prod.id}
-                                className="flex justify-between p-3 bg-gray-100 rounded cursor-pointer hover:bg-gray-200"
-                                onClick={() => {
-                                  attachProductToPlan(prod, "included");
-                                }}
+                                className="flex justify-between p-3 bg-gray-100 rounded hover:bg-gray-200"
                               >
                                 <span className="font-medium">{prod.name}</span>
-                                <button className="px-2 py-1 bg-blue-600 text-white rounded text-xs">
-                                  Add
-                                </button>
+                                <div className="flex items-center justify-center gap-2">
+                                  <button
+                                    onClick={() => attachProductToPlan(prod, "included")}
+                                    className="px-2 py-1 bg-blue-600 text-white rounded text-xs cursor-pointer"
+                                  >
+                                    Add
+                                  </button>
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -533,8 +607,51 @@ export default function Pricing() {
                                   key={mu.productId + "-" + idx}
                                   className="flex items-center justify-between gap-4 bg-gray-50 border rounded-lg p-3"
                                 >
-                                  <div className="flex flex-col">
-                                    <span className="text-sm font-semibold text-gray-800">{mu.product?.name}</span>
+                                  <div key={mu.productId + "-" + idx} className="flex flex-col gap-2 p-3 rounded-lg bg-gray-50 w-full">
+                                    <div className="flex items-center justify-between">
+                                      <p className="text-sm font-medium text-gray-900">{mu.product?.name}</p>
+                                      <button
+                                        onClick={() =>
+                                          setCurrentPlan(prev => ({
+                                            ...prev!,
+                                            includedProducts: prev!.includedProducts.filter((_, i) => i !== idx)
+                                          }))
+                                        }
+                                        className="text-xs font-semibold text-red-600 bg-red-50 px-3 py-1.5 rounded-md 
+                                                  border border-red-200 hover:bg-red-100 hover:text-red-700 
+                                                  transition cursor-pointer"
+                                      >
+                                        Remove
+                                      </button>
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                      <label className="text-xs font-medium text-gray-600">
+                                        Number of Licenses
+                                        <span className="text-gray-400 ml-1">(optional)</span>
+                                      </label>
+                                      <input
+                                        className="border border-gray-300 px-3 py-2 rounded text-sm
+                                                  focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                                        value={mu.product?.license || ""}
+                                        onChange={(e) => {
+                                          const updatedLicense = e.target.value;
+                                          setCurrentPlan(prev => ({
+                                            ...prev!,
+                                            includedProducts: prev!.includedProducts.map((item, i) =>
+                                              i === idx
+                                                ? {
+                                                    ...item,
+                                                    product: {
+                                                      ...item.product,
+                                                      license: updatedLicense,
+                                                    },
+                                                  }
+                                                : item
+                                            ),
+                                          }));
+                                        }}
+                                      />
+                                    </div>
                                   </div>
                                 </div>
                                 ))}
@@ -581,17 +698,73 @@ export default function Pricing() {
                           ) : (
                             <div className="space-y-3">
                               {currentPlan?.meteredProducts?.map((mu, idx) => (
-                                <div key={mu.productId + "-" + idx} className="flex items-center gap-4">
-                                  <div className="w-1/3">
-                                    <div className="text-sm font-medium">{mu.product?.name}</div>
+                                <div key={mu.productId + "-" + idx} className="flex flex-col gap-2 p-3 rounded-lg bg-gray-50 w-full">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-sm font-medium text-gray-900">{mu.product?.name}</p>
+                                    <button
+                                      onClick={() =>
+                                        setCurrentPlan(prev => ({
+                                          ...prev!,
+                                          meteredProducts: prev!.meteredProducts.filter((_, i) => i !== idx)
+                                        }))
+                                      }
+                                      className="text-xs font-semibold text-red-600 bg-red-50 px-3 py-1.5 rounded-md border border-red-200 hover:bg-red-100 hover:text-red-700 transition cursor-pointer"
+                                    >
+                                      Remove
+                                    </button>
                                   </div>
-                                  <div className="flex-1">
-                                    <input
-                                      className="w-full border px-3 py-2 rounded"
-                                      value={String(mu.credits)}
-                                      onChange={(e) => updateMeteredCredit(idx, e.target.value)}
-                                      inputMode="numeric"
-                                    />
+                                  <div className="flex flex-col gap-2">
+                                    <div className="flex flex-col gap-1">
+                                      <label className="text-xs font-medium text-gray-600">
+                                        Credits
+                                        <span className="text-gray-400 ml-1">(required)</span>
+                                      </label>
+                                      <input
+                                        className="border border-gray-300 px-3 py-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                                        value={String(mu.credits) || ""}
+                                        onChange={(e) => {
+                                          const updatedCredits = e.target.value;
+                                          setCurrentPlan(prev => ({
+                                            ...prev!,
+                                            meteredProducts: prev!.meteredProducts.map((item, i) =>
+                                              i === idx
+                                                ? {
+                                                    ...item,
+                                                    credits: updatedCredits,
+                                                  }
+                                                : item
+                                            ),
+                                          }));
+                                        }}
+                                      />
+                                    </div>
+                                    {/* <div className="flex flex-col gap-1">
+                                      <label className="text-xs font-medium text-gray-600">
+                                        Number of Licenses
+                                        <span className="text-gray-400 ml-1">(optional)</span>
+                                      </label>
+                                      <input
+                                        className="border border-gray-300 px-3 py-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                                        value={String(mu.product?.license) || ""}
+                                        onChange={(e) => {
+                                          const updatedLicense = e.target.value;
+                                          setCurrentPlan(prev => ({
+                                            ...prev!,
+                                            meteredProducts: prev!.meteredProducts.map((item, i) =>
+                                              i === idx
+                                                ? {
+                                                    ...item,
+                                                    product: {
+                                                      ...item.product,
+                                                      license: updatedLicense,
+                                                    },
+                                                  }
+                                                : item
+                                            ),
+                                          }));
+                                        }}
+                                      />
+                                    </div> */}
                                   </div>
                                 </div>
                               ))}
@@ -611,7 +784,12 @@ export default function Pricing() {
                       <div className="space-y-5 border-r pr-5">
                         <h3 className="text-lg font-semibold text-blue-600">Fixed Plan Details</h3>
                         <div>
-                          <label className="block text-sm font-semibold">Fixed Price</label>
+                          <label className="text-sm font-medium text-gray-700">
+                            Fixed Price
+                            <span className="ml-1 text-xs text-blue-600 font-normal">
+                              (required)
+                            </span>
+                          </label>
                           <input
                             className="w-full border px-3 py-2 rounded mt-1"
                             value={String(currentPlan.fixedPrice ?? "")}
@@ -620,7 +798,13 @@ export default function Pricing() {
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold">Billing Cycle (in months)</label>
+                          <label className="block text-sm font-semibold"></label>
+                          <label className="text-sm font-medium text-gray-700">
+                            Billing Cycle (in months)
+                            <span className="ml-1 text-xs text-blue-600 font-normal">
+                              (required)
+                            </span>
+                          </label>
                           <input
                             type="number"
                             className="w-full border px-3 py-2 rounded mt-1"
@@ -632,7 +816,7 @@ export default function Pricing() {
                         </div>
                         <div className="bg-white p-6 rounded shadow mb-4">
                           <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-semibold">Included Products</h3>
+                            <h3 className="font-semibold">All Products</h3>
                             <button
                               onClick={() => {
                                 setProductType("included");
@@ -672,8 +856,51 @@ export default function Pricing() {
                                   key={mu.productId + "-" + idx}
                                   className="flex items-center justify-between gap-4 bg-gray-50 border rounded-lg p-3"
                                 >
-                                  <div className="flex flex-col">
-                                    <span className="text-sm font-semibold text-gray-800">{mu.product?.name}</span>
+                                  <div key={mu.productId + "-" + idx} className="flex flex-col gap-2 p-3 rounded-lg bg-gray-50 w-full">
+                                    <div className="flex items-center justify-between">
+                                      <p className="text-sm font-medium text-gray-900">{mu.product?.name}</p>
+                                      <button
+                                        onClick={() =>
+                                          setCurrentPlan(prev => ({
+                                            ...prev!,
+                                            includedProducts: prev!.includedProducts.filter((_, i) => i !== idx)
+                                          }))
+                                        }
+                                        className="text-xs font-semibold text-red-600 bg-red-50 px-3 py-1.5 rounded-md 
+                                                  border border-red-200 hover:bg-red-100 hover:text-red-700 
+                                                  transition cursor-pointer"
+                                      >
+                                        Remove
+                                      </button>
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                      <label className="text-xs font-medium text-gray-600">
+                                        Number of Licenses
+                                        <span className="text-gray-400 ml-1">(optional)</span>
+                                      </label>
+                                      <input
+                                        className="border border-gray-300 px-3 py-2 rounded text-sm
+                                                  focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                                        value={mu.product?.license || ""}
+                                        onChange={(e) => {
+                                          const updatedLicense = e.target.value;
+                                          setCurrentPlan(prev => ({
+                                            ...prev!,
+                                            includedProducts: prev!.includedProducts.map((item, i) =>
+                                              i === idx
+                                                ? {
+                                                    ...item,
+                                                    product: {
+                                                      ...item.product,
+                                                      license: updatedLicense,
+                                                    },
+                                                  }
+                                                : item
+                                            ),
+                                          }));
+                                        }}
+                                      />
+                                    </div>
                                   </div>
                                 </div>
                                 ))}
@@ -686,9 +913,14 @@ export default function Pricing() {
                       {/* Metered */}
                       <div className="space-y-5">
                         <h3 className="text-lg font-semibold text-blue-600">Metered Plan Details</h3>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4">
                           <div>
-                            <label className="block text-sm font-semibold">Base Price</label>
+                            <label className="text-sm font-medium text-gray-700">
+                              Base Price
+                              <span className="ml-1 text-xs text-blue-600 font-normal">
+                                (required)
+                              </span>
+                            </label>
                             <input
                               className="w-full border px-3 py-2 rounded mt-1"
                               value={String(currentPlan.basePrice ?? "")}
@@ -697,7 +929,12 @@ export default function Pricing() {
                             />
                           </div>
                           <div>
-                            <label className="block text-sm font-semibold">Credits Included</label>
+                            <label className="text-sm font-medium text-gray-700">
+                              Credits Included
+                              <span className="ml-1 text-xs text-blue-600 font-normal">
+                                (required)
+                              </span>
+                            </label>
                             <input
                               className="w-full border px-3 py-2 rounded mt-1"
                               value={String(currentPlan.creditsIncluded ?? "")}
@@ -707,7 +944,13 @@ export default function Pricing() {
                           </div>
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold">Validity (in months)</label>
+                          <label className="block text-sm font-semibold"></label>
+                          <label className="text-sm font-medium text-gray-700">
+                            Validity (in months)
+                            <span className="ml-1 text-xs text-blue-600 font-normal">
+                              (required)
+                            </span>
+                          </label>
                           <input
                             type="number"
                             className="w-full border px-3 py-2 rounded mt-1"
@@ -719,7 +962,7 @@ export default function Pricing() {
                         </div>
                         <div className="bg-white p-6 rounded shadow mb-4">
                           <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-semibold">Metered Products</h3>
+                            <h3 className="font-semibold">All Products</h3>
                             <button
                               onClick={() => {
                                 setProductType("metered");
@@ -752,18 +995,77 @@ export default function Pricing() {
                             <p className="text-sm text-gray-500">No metered products yet.</p>
                           ): (
                             <div className="space-y-3">
+                              <h3 className="font-semibold pt-1">Metered Products</h3>
                               {currentPlan?.meteredProducts?.map((mu, idx) => (
                                 <div key={mu.productId + "-" + idx} className="flex items-center gap-4">
-                                  <div className="w-1/3">
-                                    <div className="text-sm font-medium">{mu.product?.name}</div>
-                                  </div>
-                                  <div className="flex-1">
-                                    <input
-                                      className="w-full border px-3 py-2 rounded"
-                                      value={String(mu.credits)}
-                                      onChange={(e) => updateMeteredCredit(idx, e.target.value)}
-                                      inputMode="numeric"
-                                    />
+                                  <div key={mu.productId + "-" + idx} className="flex flex-col gap-2 p-3 rounded-lg bg-gray-50 w-full">
+                                    <div className="flex items-center justify-between">
+                                      <p className="text-sm font-medium text-gray-900">{mu.product?.name}</p>
+                                      <button
+                                        onClick={() =>
+                                          setCurrentPlan(prev => ({
+                                            ...prev!,
+                                            meteredProducts: prev!.meteredProducts.filter((_, i) => i !== idx)
+                                          }))
+                                        }
+                                        className="text-xs font-semibold text-red-600 bg-red-50 px-3 py-1.5 rounded-md border border-red-200 hover:bg-red-100 hover:text-red-700 transition cursor-pointer"
+                                      >
+                                        Remove
+                                      </button>
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                      <div className="flex flex-col gap-1">
+                                        <label className="text-xs font-medium text-gray-600">
+                                          Credits
+                                          <span className="text-gray-400 ml-1">(required)</span>
+                                        </label>
+                                        <input
+                                          className="border border-gray-300 px-3 py-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                                          value={String(mu.credits) || ""}
+                                          onChange={(e) => {
+                                            const updatedCredits = e.target.value;
+                                            setCurrentPlan(prev => ({
+                                              ...prev!,
+                                              meteredProducts: prev!.meteredProducts.map((item, i) =>
+                                                i === idx
+                                                  ? {
+                                                      ...item,
+                                                      credits: updatedCredits,
+                                                    }
+                                                  : item
+                                              ),
+                                            }));
+                                          }}
+                                        />
+                                      </div>
+                                      {/* <div className="flex flex-col gap-1">
+                                        <label className="text-xs font-medium text-gray-600">
+                                          Number of Licenses
+                                          <span className="text-gray-400 ml-1">(optional)</span>
+                                        </label>
+                                        <input
+                                          className="border border-gray-300 px-3 py-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                                          value={String(mu.product?.license) || ""}
+                                          onChange={(e) => {
+                                            const updatedLicense = e.target.value;
+                                            setCurrentPlan(prev => ({
+                                              ...prev!,
+                                              meteredProducts: prev!.meteredProducts.map((item, i) =>
+                                                i === idx
+                                                  ? {
+                                                      ...item,
+                                                      product: {
+                                                        ...item.product,
+                                                        license: updatedLicense,
+                                                      },
+                                                    }
+                                                  : item
+                                              ),
+                                            }));
+                                          }}
+                                        />
+                                      </div> */}
+                                    </div>
                                   </div>
                                 </div>
                               ))}
@@ -810,8 +1112,16 @@ export default function Pricing() {
             className="bg-white p-6 rounded shadow w-full max-w-md"
           >
             <h3 className="font-semibold mb-3">Create Product</h3>
+            {error && (
+              <p className="text-sm text-red-600 font-medium py-2">{error}</p>
+            )}
 
-            <label className="block text-sm font-medium">Name</label>
+            <label className="text-sm font-medium text-gray-700">
+              Name
+              <span className="ml-1 text-xs text-blue-600 font-normal">
+                (required)
+              </span>
+            </label>
             <input
               className="w-full border px-3 py-2 rounded mt-1 mb-3"
               value={newProductName}
@@ -819,7 +1129,12 @@ export default function Pricing() {
               placeholder="e.g. WhatsApp"
             />
 
-            <label className="block text-sm font-medium">License number (optional)</label>
+            <label className="text-sm font-medium text-gray-700">
+              Number of License
+              <span className="ml-1 text-xs text-blue-600 font-normal">
+                (optional)
+              </span>
+            </label>
             <input
               className="w-full border px-3 py-2 rounded mt-1 mb-4"
               value={newProductLicense}

@@ -9,6 +9,7 @@ export default function AddBrand({ onDone }: { onDone: () => void }) {
     name: "",
     businessId: "",
   });
+  const [error, setError] = useState("");
 
   // Load all businesses for dropdown
   useEffect(() => {
@@ -23,8 +24,14 @@ export default function AddBrand({ onDone }: { onDone: () => void }) {
   };
 
   const handleSubmit = async () => {
-    if (!form.businessId) return alert("Please select a business.");
-    if (!form.name) return alert("Brand name is required.");
+    if (!form.businessId.trim()) {
+      setError("Business is required.");
+      return;
+    }
+    if (!form.name.trim()) {
+      setError("Brand name is required.");
+      return;
+    }
     try {
       const URL = process.env.NEXT_PUBLIC_API_URL;
       await axios.post(`${URL}/brand`, {
@@ -44,12 +51,20 @@ export default function AddBrand({ onDone }: { onDone: () => void }) {
     <div className="flex justify-center items-center min-h-screen bg-gray-100 p-4">
       <div className="w-full max-w-lg bg-white rounded-xl shadow-lg p-6">
         <h1 className="text-2xl font-bold mb-6 text-center">Add Brand</h1>
+        {error && (
+          <p className="text-sm text-red-600 font-medium py-2">{error}</p>
+        )}
 
         <div className="space-y-4">
 
           {/* Business Select */}
-          <div>
-            <label className="block font-medium mb-1">Select Business</label>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">
+              Select Business
+              <span className="ml-1 text-xs text-blue-600 font-normal">
+                (required)
+              </span>
+            </label>
             <select
               name="businessId"
               onChange={handleChange}
@@ -65,8 +80,13 @@ export default function AddBrand({ onDone }: { onDone: () => void }) {
           </div>
 
           {/* Brand Name */}
-          <div>
-            <label className="block font-medium mb-1">Brand Name</label>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">
+              Brand Name
+              <span className="ml-1 text-xs text-blue-600 font-normal">
+                (required)
+              </span>
+            </label>
             <input
               name="name"
               placeholder="Brand Name"

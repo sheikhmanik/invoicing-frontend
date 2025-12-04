@@ -18,6 +18,7 @@ export default function SelectBusiness({ onSelect }: any) {
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [creatingNewBusiness, setCreatingNewBusiness] = useState(false);
+  const [error, setError] = useState("");
 
   const [form, setForm] = useState<BusinessForm>({
     name: "",
@@ -37,19 +38,40 @@ export default function SelectBusiness({ onSelect }: any) {
   // Submit form
   const handleSubmit = async () => {
     try {
-
-      const missingFields = Object.entries(form).filter(([_, value]) => !value);
-      if (missingFields.length > 0) {
-        return alert("Please fill all required fields.")
-      }
-
-      if (form.GSTIN.trim().length !== 15) {
-        alert("GSTIN must be 15 characters.");
+      if(!form.name.trim()) {
+        setError("Name is required.");
         return;
       }
-
+      if(!form.address.trim()) {
+        setError("Address is required.");
+        return;
+      }
+      if(!form.location.trim()) {
+        setError("Location is required.");
+        return;
+      }
+      if(!form.GSTIN.trim()) {
+        setError("GSTIN is required.");
+        return;
+      }
+      if(!form.PrimaryContactName.trim()) {
+        setError("Primary Contact Name is required.");
+        return;
+      }
+      if(!form.PrimaryContactPhone.trim()) {
+        setError("Primary Contact Phone is required.");
+        return;
+      }
+      if(!form.PrimaryContactEmail.trim()) {
+        setError("Primary Contact Email is required.");
+        return;
+      }
+      if (!/\S+@\S+\.\S+/.test(form.PrimaryContactEmail.trim())) {
+        alert("Invalid email format.");
+        return;
+      }
       if (!/^[0-9]{10}$/.test(form.PrimaryContactPhone.trim())) {
-        alert("Phone number must be 10 digits.");
+        setError("Primary Contact Phone must be a valid 10-digit number.");
         return;
       }
 
@@ -173,15 +195,75 @@ export default function SelectBusiness({ onSelect }: any) {
 
             <h1 className="text-2xl font-bold mb-6 text-center">Add Business</h1>
 
+            {error && (
+              <p className="text-sm text-red-600 font-medium py-2">{error}</p>
+            )}
+
             <div className="space-y-4">
 
-              <Input label="Name" name="name" onChange={handleChange} />
-              <Input label="Address" name="address" onChange={handleChange} />
-              <Input label="Location" name="location" onChange={handleChange} />
-              <Input label="GSTIN" name="GSTIN" onChange={handleChange} />
-              <Input label="Primary Contact Name" name="PrimaryContactName" onChange={handleChange} />
-              <Input label="Primary Contact Phone" name="PrimaryContactPhone" onChange={handleChange} />
-              <Input label="Primary Contact Email" name="PrimaryContactEmail" onChange={handleChange} />
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-gray-700">
+                  Business Name
+                  <span className="ml-1 text-xs text-blue-600 font-normal">
+                    (required)
+                  </span>
+                </label>
+                <Input label="Name" name="name" onChange={handleChange} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-gray-700">
+                  Business Address
+                  <span className="ml-1 text-xs text-blue-600 font-normal">
+                    (required)
+                  </span>
+                </label>
+                <Input label="Address" name="address" onChange={handleChange} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-gray-700">
+                  Business Location
+                  <span className="ml-1 text-xs text-blue-600 font-normal">
+                    (required)
+                  </span>
+                </label>
+                <Input label="Location" name="location" onChange={handleChange} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-gray-700">
+                  Business GSTIN
+                  <span className="ml-1 text-xs text-blue-600 font-normal">
+                    (required)
+                  </span>
+                </label>
+                <Input label="GSTIN" name="GSTIN" onChange={handleChange} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-gray-700">
+                  Primary Contact Name
+                  <span className="ml-1 text-xs text-blue-600 font-normal">
+                    (required)
+                  </span>
+                </label>
+                <Input label="Primary Contact Name" name="PrimaryContactName" onChange={handleChange} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-gray-700">
+                  Primary Contact Phone
+                  <span className="ml-1 text-xs text-blue-600 font-normal">
+                    (required)
+                  </span>
+                </label>
+                <Input label="Primary Contact Phone" name="PrimaryContactPhone" onChange={handleChange} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-gray-700">
+                  Primary Contact Email
+                  <span className="ml-1 text-xs text-blue-600 font-normal">
+                    (required)
+                  </span>
+                </label>
+                <Input label="Primary Contact Email" name="PrimaryContactEmail" onChange={handleChange} />
+              </div>
 
               <button
                 onClick={handleSubmit}
@@ -200,13 +282,10 @@ export default function SelectBusiness({ onSelect }: any) {
 /* SMALL INPUT COMPONENT */
 function Input({ label, name, onChange }: any) {
   return (
-    <div>
-      <label className="block font-medium mb-1">{label}</label>
-      <input
-        name={name}
-        onChange={onChange}
-        className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-      />
-    </div>
+    <input
+      name={name}
+      onChange={onChange}
+      className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+    />
   );
 }

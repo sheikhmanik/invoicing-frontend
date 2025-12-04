@@ -13,6 +13,7 @@ export default function SelectBrand({ business, onBack, onSelect }: any) {
   const [form, setForm] = useState({
     name: "",
   });
+  const [error, setError] = useState("");
 
   const handleChange = (e: any) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -20,7 +21,7 @@ export default function SelectBrand({ business, onBack, onSelect }: any) {
 
   const handleSubmit = async () => {
     if (!form.name.trim()) {
-      alert("Please enter brand name.");
+      setError("Brand name is required.");
       return;
     }
 
@@ -127,6 +128,9 @@ export default function SelectBrand({ business, onBack, onSelect }: any) {
             </button>
 
             <h1 className="text-2xl font-bold mb-6 text-center">Add Brand</h1>
+            {error && (
+              <p className="text-sm text-red-600 font-medium py-2">{error}</p>
+            )}
 
             <div className="space-y-4">
               <div>

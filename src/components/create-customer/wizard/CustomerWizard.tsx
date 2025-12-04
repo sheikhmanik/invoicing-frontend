@@ -3,7 +3,7 @@
 import { useState } from "react";
 import SelectBusiness from "./SelectBusiness";
 import SelectBrand from "./SelectBrand";
-import CreateStore from "./CreateStore";
+import CreateStore from "./CreateRestaurant";
 
 export default function CustomerWizard({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState<number>(1);

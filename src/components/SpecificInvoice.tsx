@@ -73,6 +73,7 @@ interface PricingPlan {
 }
 
 interface RestaurantInvoice {
+  id: number;
   invoiceNumber: string;
   subTotalAmount: number;
   totalAmount: number;
@@ -267,32 +268,59 @@ export default function SpecificInvoice() {
             <td className="border p-2 text-center">₹{totalAmount}.00/-</td>
           </tr>
           
-          {/* LAST PARTIAL PAYMENT RECORD */}
+          {/* PAYMENT HISTORY UP TO THIS INVOICE */}
           {(() => {
-            const specificInv = restaurant.invoices.find((inv: any) => inv.id === specificInvId);
+            const invoices = restaurant.invoices || [];
+            const sorted = [...invoices].sort((a, b) => a.id - b.id); // oldest → latest
+            const indexOfCurrent = sorted.findIndex((inv) => inv.id === specificInvId);
 
-            return (specificInv && specificInv.partialAmount > 0) ? (
-              <tr className="bg-green-50 font-medium">
+            if (indexOfCurrent === -1) return null;
+
+            // include only invoices up to the selected one
+            const displayInvoices = sorted.slice(0, indexOfCurrent + 1);
+
+            // filter only invoices which have payments
+            const paymentHistory = displayInvoices.filter(inv => inv.partialAmount > 0);
+
+            if (paymentHistory.length === 0) {
+              return (
+                <tr className="bg-red-50">
+                  <td colSpan={4} className="border p-2 text-center text-red-600 italic">
+                    No payments made yet
+                  </td>
+                </tr>
+              );
+            }
+
+            return paymentHistory.map((inv, i) => (
+              <tr key={i} className="bg-green-50 font-medium">
                 <td colSpan={3} className="border p-2 text-right text-green-700">
-                  Partially Paid — {specificInv.paymentDate?.split("T")[0] || "—"}
+                  {inv.status === "paid" ? "Paid" : "Partially Paid"} — {inv.paymentDate?.split("T")[0] || "—"}
                 </td>
+
                 <td className="border p-2 text-center text-green-700">
-                  ₹{specificInv.partialAmount}.00/-
+                  ₹{inv.partialAmount}.00/-
+                </td>
+              </tr>
+            ));
+          })()}
+
+          {/* REMAINING DUE — ONLY FOR CURRENT INVOICE */}
+          {(() => {
+            const specificInv = restaurant.invoices.find(inv => inv.id === specificInvId);
+            if (!specificInv) return null;
+
+            return specificInv.remainingAmount > 0 ? (
+              <tr className="bg-red-50 font-semibold">
+                <td colSpan={3} className="border p-2 text-right text-red-700">
+                  Remaining Amount Due
+                </td>
+                <td className="border p-2 text-center text-red-700">
+                  ₹{Math.max(specificInv.remainingAmount, 0)}.00/-
                 </td>
               </tr>
             ) : null;
           })()}
-
-          {invoice.remainingAmount !== undefined && (
-            <tr className="bg-red-50 font-semibold">
-              <td colSpan={3} className="border p-2 text-right text-red-700">
-                Remaining Amount Due
-              </td>
-              <td className="border p-2 text-center text-red-700">
-                ₹{Math.max(invoice.remainingAmount, 0)}.00/-
-              </td>
-            </tr>
-          )}
 
         </tbody>
       </table>

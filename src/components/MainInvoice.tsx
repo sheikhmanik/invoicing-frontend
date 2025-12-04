@@ -189,7 +189,7 @@ export default function ProformaInvoice() {
 
       {/* Title + Date */}
       <div className="flex justify-between mb-4 mt-10">
-        <h3 className="text-xl font-bold">{invoice.status === "pending" ? "Proforma Invoice" : invoice.status === "paid" ? "Tax Invoice" : ""}</h3>
+        <h3 className="text-xl font-bold">{invoice.status === "pending" ? "Proforma Invoice" : invoice.status === "paid" ? "Tax Invoice" : invoice.status === "partially paid" ? "Proforma Invoice (partially paid)" : ""}</h3>
         <p>Date: {new Date().toLocaleDateString("en-GB")}</p>
       </div>
 
@@ -228,34 +228,34 @@ export default function ProformaInvoice() {
               {subscriptionPeriod}
             </td>
             <td className="border p-2 text-center">
-              ₹{subTotalAmount}.00/-
+              {subTotalAmount}.00/-
             </td>
             <td className="border p-2 text-center">
-              ₹{subTotalAmount}.00/-
+              {subTotalAmount}.00/-
             </td>
           </tr>
 
           <tr>
             <td colSpan={3} className="border p-2 text-right font-semibold">Subtotal</td>
-            <td className="border p-2 text-center">₹{subTotalAmount}.00/-</td>
+            <td className="border p-2 text-center">{subTotalAmount}.00/-</td>
           </tr>
 
           {restaurant.restaurantPricingPlans[0].cgst && (
             <tr>
               <td colSpan={3} className="border p-2 text-right">CGST (9%)</td>
-              <td className="border p-2 text-center">₹{Number(subTotalAmount * 0.09)}.00/-</td>
+              <td className="border p-2 text-center">{Number(subTotalAmount * 0.09)}.00/-</td>
             </tr>
           )}
           {restaurant.restaurantPricingPlans[0].sgst && (
             <tr>
               <td colSpan={3} className="border p-2 text-right">SGST (9%)</td>
-              <td className="border p-2 text-center">₹{Number(subTotalAmount * 0.09)}.00/-</td>
+              <td className="border p-2 text-center">{Number(subTotalAmount * 0.09)}.00/-</td>
             </tr>
           )}
           {restaurant.restaurantPricingPlans[0].igst && (
             <tr>
               <td colSpan={3} className="border p-2 text-right">IGST (18%)</td>
-              <td className="border p-2 text-center">₹{Number(subTotalAmount * 0.18)}.00/-</td>
+              <td className="border p-2 text-center">{Number(subTotalAmount * 0.18)}.00/-</td>
             </tr>
           )}
 
@@ -263,30 +263,46 @@ export default function ProformaInvoice() {
             <td colSpan={3} className="border p-2 text-right">
               Total — {amountInWords}
             </td>
-            <td className="border p-2 text-center">₹{totalAmount}.00/-</td>
+            <td className="border p-2 text-center">{totalAmount}.00/-</td>
           </tr>
           
-          {/* LAST PARTIAL PAYMENT RECORD */}
+          {/* ALL PAYMENT RECORDS THAT REDUCE REMAINING AMOUNT */}
           {(() => {
             const partials = restaurant.invoices
-              ?.filter((inv: any) => inv.status === "partially paid")
+              ?.filter((inv: any) => inv.partialAmount > 0) // 👈 include FULL payment if partialAmount exists
               ?.sort(
                 (a: any, b: any) =>
                   new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()
               );
 
-            const lastPartial = partials?.[partials.length - 1];
+            if (!partials || partials.length === 0) return null;
 
-            return lastPartial ? (
-              <tr className="bg-green-50 font-medium">
-                <td colSpan={3} className="border p-2 text-right text-green-700">
-                  Partially Paid — {lastPartial.paymentDate?.split("T")[0] || "—"}
-                </td>
-                <td className="border p-2 text-center text-green-700">
-                  ₹{lastPartial.partialAmount}.00/-
-                </td>
-              </tr>
-            ) : null;
+            return partials.map((inv: any, index: number) => {
+              const isLatest = index === partials.length - 1;
+              const fullyPaid = inv.status === "paid";
+
+              return (
+                <tr
+                  key={inv.id || index}
+                  className={`text-sm ${
+                    fullyPaid
+                      ? "bg-green-100 font-bold" // ✔ last payment that completed billing
+                      : isLatest
+                      ? "bg-green-50 font-semibold"
+                      : "bg-orange-50"
+                  }`}
+                >
+                  <td colSpan={3} className="border p-2 text-right">
+                    {fullyPaid ? "Fully Paid — " : "Partially Paid — "}
+                    {inv.paymentDate?.split("T")[0] || "—"}
+                  </td>
+
+                  <td className="border p-2 text-center">
+                    ₹{inv.partialAmount}.00/-
+                  </td>
+                </tr>
+              );
+            });
           })()}
 
           {invoice.remainingAmount !== undefined && (
@@ -295,7 +311,7 @@ export default function ProformaInvoice() {
                 Remaining Amount Due
               </td>
               <td className="border p-2 text-center text-red-700">
-                ₹{Math.max(invoice.remainingAmount, 0)}.00/-
+                {Math.max(invoice.remainingAmount, 0)}.00/-
               </td>
             </tr>
           )}

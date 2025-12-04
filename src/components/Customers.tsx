@@ -1,9 +1,7 @@
 "use client";
 
 import axios from "axios";
-import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 interface Product {
@@ -37,23 +35,47 @@ export interface PricingPlan {
   basePrice: number | string;
   creditsIncluded: number | string;
   validity: number;
+  billingCycle: string;
   meteredProducts: MeteredProduct[];
   includedProducts: IncludedProduct[];
   createdAt?: string;
+  invoices: any[];
+  restaurantName: string;
+  pricingPlan: any[];
+}
+
+interface Restaurant {
+  id: number;
+  name: string;
+  location: string;
+  brand: {
+    id: number;
+    name: string;
+    business: {
+      id: number;
+      name: string;
+    };
+  } | null;
+  restaurantPricingPlans: {
+    pricingPlan: PricingPlan;
+  }[];
+  invoices: any[];
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
-export default function Customers({ onDone }: { onDone: () => void }) {
+export default function Customers() {
 
   const [restaurants, setRestaurants] = useState([]);
+  const [currentResId, serCurrentResId] = useState<number | null>(null);
+  const [currentRestaurant, setCurrentRestaurant] = useState<Restaurant[]>([]);
   const [allPlans, setAllPlans] = useState<PricingPlan[]>([]);
   const [planEditingModal, setPlanEditingModal] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState<null | Record<any, any>>(null);
   const [currentPlan, setCurrentPlan] = useState<PricingPlan>();
   const [confirmAssigned, setConfirmAssigned] = useState(false);
+  const [confirmAssignModal, setConfirmAssignModal] = useState(false);
   const [updatePayment, setUpdatePayment] = useState(false);
-  const [currentResId, serCurrentResId] = useState<number | null>(null);
   const [paidCustomers, setPaidCustomers] = useState([]);
   const [unpaidCustomers, setUnpaidCustomers] = useState([]);
   const [display, setDisplay] = useState<"paid" | "unpaid" | "customers">(() => {
@@ -113,8 +135,7 @@ export default function Customers({ onDone }: { onDone: () => void }) {
     if (!planMode) return alert("Please include plan mode.");
     if (planMode === "trial" && !trialDays) return alert("Please include trial days.");
     if (!confirmAssigned) {
-      alert("Please confirm. We can not go back. Edit this again.");
-      setConfirmAssigned(true);
+      setConfirmAssignModal(true);
       return;
     }
     setAssigningPlanId(pricingPlanId);
@@ -128,8 +149,8 @@ export default function Customers({ onDone }: { onDone: () => void }) {
       trialDays,
     }
     try {
-      await axios.post(`${API}/restaurant/plan-map`, payload);
-      alert("Plan assigned successfully");
+      await axios.post(`${API}/restaurant/assign-plan`, payload);
+      alert("Plan assigned successfully!");
       setPlanEditingModal(false);
       window.location.reload();
     } catch (err) {
@@ -209,7 +230,7 @@ export default function Customers({ onDone }: { onDone: () => void }) {
       setUpdatePayment(false);
       serCurrentResId(null);
       window.location.reload();
-  
+
     } catch (err) {
       console.error(err);
       setError("Upload failed. Try again.");
@@ -221,7 +242,6 @@ export default function Customers({ onDone }: { onDone: () => void }) {
   useEffect(() => {
     axios.get(`${API}/restaurant`).then((res) => {
       setRestaurants(res.data);
-      console.log(res.data);
       const paid = res.data?.filter((res: any) => res.invoices.length > 0 &&  res.invoices.at(-1).status === "paid");
       const unpaid = res.data?.filter((res: any) => 
         res.invoices.length > 0 &&  res.invoices.at(-1).status === "pending" ||
@@ -231,6 +251,16 @@ export default function Customers({ onDone }: { onDone: () => void }) {
       if (unpaid) setUnpaidCustomers(unpaid);
     });
   }, []);
+
+  useEffect(() => {
+    if (currentResId === null) {
+      setCurrentRestaurant([]);
+    } else {
+      const filtered = restaurants.filter((r: any) => r.id === currentResId);
+      setCurrentRestaurant(filtered);
+      console.log(filtered);
+    }
+  }, [currentResId, restaurants]);
 
   useEffect(() => {
     (async function fetchPricingPlan() {
@@ -426,106 +456,104 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                           </div>
                         </td>
 
+                        {/* PAID */}
                         <td className="p-4 border-r text-center leading-5">
-
-                          {/* still loading or no invoices */}
-                          {(!r.invoices || r.invoices.length === 0) && "—"}
-
                           {(() => {
                             const invoices = r.invoices || [];
-                            const latest = invoices.at(-1);
-                            const partials = invoices.filter((inv: any) => inv.status === "partially paid");
+                            if (invoices.length === 0) {
+                              return <span className="text-gray-400">—</span>;
+                            }
 
-                            // CASE 1 → no payments yet (pending only)
-                            if (latest?.status === "pending" && partials.length === 0) {
+                            const latest = invoices.at(-1);
+                            const status = latest?.status?.toLowerCase().trim();
+                            const partials = invoices.filter((inv: any) =>
+                              inv.status?.toLowerCase().trim() === "partially paid"
+                            );
+
+                            console.log("STATUS:", status, "LATEST:", latest, "PARTIALS:", partials);
+
+                            // ⭐ Fully Paid
+                            if (status === "paid") {
                               return (
-                                <div className="text-gray-600 text-sm italic">
-                                  No payments made yet
+                                <div className="space-y-1 text-xs text-center">
+                                  <div className="font-semibold text-green-700">Fully Paid ✓</div>
+                                  <div className="text-gray-800">
+                                    {latest.paymentDate?.split("T")[0] ?? "—"}
+                                  </div>
+                                  <div className="text-green-700 font-medium">
+                                    Tax Invoice
+                                  </div>
                                 </div>
                               );
                             }
 
-                            // CASE 2 → there are partial payments → show all of them
-                            if (partials.length > 0) {
+                            // ⭐ Partially Paid
+                            if (partials.length > 0 || status === "partially paid") {
                               return (
                                 <div className="space-y-2">
-
-                                  {partials.map((inv: any, i: number) => (
+                                  {partials.map((inv: any, index: number) => (
                                     <div
-                                      key={i}
-                                      className="bg-orange-50 border border-orange-200 rounded p-2 text-xs shadow-sm"
+                                      key={index}
+                                      className="bg-orange-50 border border-orange-200 rounded-md p-2 text-xs shadow-sm text-left"
                                     >
-                                      <div className="font-medium text-orange-700">
-                                        Partially Paid: ₹{inv.partialAmount}/-
+                                      <div className="font-semibold text-orange-700">
+                                        Paid: ₹{inv.partialAmount}/-
+                                      </div>
+                                      <div className="text-gray-800">
+                                        Date: {inv.paymentDate?.split("T")[0] ?? "—"}
                                       </div>
 
-                                      <div className="text-gray-700">
-                                        Date: {inv.paymentDate?.split("T")[0]}
-                                      </div>
-
-                                      {/* Notes */}
                                       {inv.paymentNotes && (
-                                        <div className="text-gray-600 italic mt-1">
+                                        <div className="text-gray-600 italic">
                                           {inv.paymentNotes}
                                         </div>
                                       )}
 
-                                      {/* Remaining Amount */}
-                                      {inv.remainingAmount !== null && (
-                                        <div
-                                          className={`font-semibold mt-1 
-                                          ${inv.remainingAmount > 0 ? "text-red-600" : "text-green-700"}`}
-                                        >
-                                          Remaining: ₹{Math.max(0, inv.remainingAmount)}/-
-                                        </div>
-                                      )}
+                                      <div className="font-semibold mt-1 text-red-600">
+                                        Remaining: ₹{Math.max(0, inv.remainingAmount)}/-
+                                      </div>
 
-                                      <div className="flex flex-col items-center justify-center mt-1">
-                                        {/* Receipt link (secondary) */}
+                                      <div className="py-1 flex flex-col gap-1">
                                         {inv.paymentFileUrl && (
                                           <Link
                                             href={inv.paymentFileUrl}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 text-gray-600 text-sm underline hover:text-gray-800 transition"
+                                            className="inline-flex items-center gap-1 text-gray-600 text-xs underline hover:text-gray-800 transition"
                                           >
                                             📄 View Receipt
                                           </Link>
                                         )}
-                                        {/* Invoice link (primary) */}
                                         <Link
                                           href={`/invoice/${r.id}/specific/${inv.id}`}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="mt-2 inline-block px-2 py-1 rounded-md bg-blue-600 text-white text-xs font-medium shadow hover:bg-blue-700 transition"
+                                          className="
+                                            inline-flex items-center gap-1 px-2 py-1 rounded
+                                            bg-blue-500 text-white text-[10px] font-medium
+                                            hover:bg-blue-600 shadow-sm hover:shadow transition-all
+                                          "
                                         >
-                                          View Invoice →
+                                          Invoice →
                                         </Link>
                                       </div>
-
                                     </div>
                                   ))}
-
                                 </div>
                               );
                             }
 
-                            // CASE 3 → fully paid invoice
-                            if (latest?.status === "paid") {
+                            // ⭐ No payments yet (Only Pending invoice exists)
+                            if (status === "pending") {
                               return (
-                                <div className="space-y-1 text-xs">
-                                  <div className="font-medium text-green-700">Paid</div>
-                                  <div className="text-gray-700">
-                                    {latest.paymentDate?.split("T")[0]}
-                                  </div>
-                                  <div className="text-gray-500 italic">Tax Invoice</div>
+                                <div className="text-gray-600 text-xs italic">
+                                  No payments made yet
                                 </div>
                               );
                             }
 
-                            return null;
+                            return <span className="text-gray-400">—</span>;
                           })()}
-
                         </td>
     
                         {/* INITIAL CHURN */}
@@ -686,25 +714,54 @@ export default function Customers({ onDone }: { onDone: () => void }) {
 
                         {/* Payment Docs */}
                         <td className="p-4 border-r text-center leading-5">
-                          <div className="flex flex-col items-center gap-1">
+                          <div className="space-y-3">
 
-                            {r.invoices.at(-1)?.paymentFileUrl ? (
-                              <Link
-                                href={r.invoices.at(-1)?.paymentFileUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 text-xs font-medium underline hover:text-blue-800 transition"
-                              >
-                                View Receipt
-                              </Link>
-                            ) : (
+                            {r.invoices
+                              ?.filter((inv: any) => inv.partialAmount > 0 || inv.paymentFileUrl || inv.paymentNotes) // 👈 show any payment record
+                              ?.sort(
+                                (a: any, b: any) =>
+                                  new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()
+                              )
+                              ?.map((inv: any, i: number) => (
+                                <div
+                                  key={inv.id || i}
+                                  className="bg-gray-50 border border-gray-300 rounded-lg p-2 text-left text-xs space-y-1 shadow-sm"
+                                >
+                                  <div className="flex justify-between">
+                                    <span className="font-semibold text-gray-700">
+                                      Paid: ₹{inv.partialAmount ?? 0}/-
+                                    </span>
+                                    <span className="text-gray-500">
+                                      {inv.paymentDate?.split("T")[0] || "—"}
+                                    </span>
+                                  </div>
+
+                                  {/* Notes */}
+                                  {inv.paymentNotes && (
+                                    <div className="text-gray-600 italic">
+                                      {inv.paymentNotes}
+                                    </div>
+                                  )}
+
+                                  {/* Document */}
+                                  {inv.paymentFileUrl ? (
+                                    <Link
+                                      href={inv.paymentFileUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-600 underline hover:text-blue-800"
+                                    >
+                                      📄 View Receipt
+                                    </Link>
+                                  ) : (
+                                    <span className="text-gray-400">No file</span>
+                                  )}
+                                </div>
+                              ))}
+
+                            {/* If no payment docs */}
+                            {(!r.invoices || !r.invoices.some((inv: any) => inv.paymentFileUrl || inv.paymentNotes)) && (
                               <span className="text-gray-400 text-xs">No docs added</span>
-                            )}
-
-                            {r.invoices.at(-1)?.paymentNotes && (
-                              <p className="text-gray-600 text-xs italic mt-1">
-                                {r.invoices.at(-1).paymentNotes}
-                              </p>
                             )}
 
                           </div>
@@ -712,104 +769,27 @@ export default function Customers({ onDone }: { onDone: () => void }) {
 
                         {/* PAID */}
                         <td className="p-4 border-r text-center leading-5">
-
-                          {/* still loading or no invoices */}
-                          {(!r.invoices || r.invoices.length === 0) && "—"}
-
                           {(() => {
                             const invoices = r.invoices || [];
+                            if (invoices.length === 0) {
+                              return <span className="text-gray-400">—</span>;
+                            }
+
                             const latest = invoices.at(-1);
-                            const partials = invoices.filter((inv: any) => inv.status === "partially paid");
 
-                            // CASE 1 → no payments yet (pending only)
-                            if (latest?.status === "pending" && partials.length === 0) {
-                              return (
-                                <div className="text-gray-600 text-sm italic">
-                                  No payments made yet
+                            return (
+                              <div className="space-y-1 text-xs text-center">
+                                <div className="font-semibold text-green-700">Fully Paid ✓</div>
+                                <div className="text-gray-800">
+                                  {latest.paymentDate?.split("T")[0] ?? "—"}
                                 </div>
-                              );
-                            }
-
-                            // CASE 2 → there are partial payments → show all of them
-                            if (partials.length > 0) {
-                              return (
-                                <div className="space-y-2">
-
-                                  {partials.map((inv: any, i: number) => (
-                                    <div
-                                      key={i}
-                                      className="bg-orange-50 border border-orange-200 rounded p-2 text-xs shadow-sm"
-                                    >
-                                      <div className="font-medium text-orange-700">
-                                        Paid: ₹{inv.partialAmount}/-
-                                      </div>
-
-                                      <div className="text-gray-700">
-                                        Date: {inv.paymentDate?.split("T")[0]}
-                                      </div>
-
-                                      {/* Notes */}
-                                      {inv.paymentNotes && (
-                                        <div className="text-gray-600 italic mt-1">
-                                          {inv.paymentNotes}
-                                        </div>
-                                      )}
-
-                                      {/* Remaining Amount */}
-                                      {inv.remainingAmount !== null && (
-                                        <div
-                                          className={`font-semibold mt-1 
-                                          ${inv.remainingAmount > 0 ? "text-red-600" : "text-green-700"}`}
-                                        >
-                                          Remaining: ₹{Math.max(0, inv.remainingAmount)}/-
-                                        </div>
-                                      )}
-
-                                      <div className="flex flex-col items-center justify-center mt-1">
-                                        {/* Receipt link (secondary) */}
-                                        {inv.paymentFileUrl && (
-                                          <Link
-                                            href={inv.paymentFileUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 text-gray-600 text-sm underline hover:text-gray-800 transition"
-                                          >
-                                            📄 View Receipt
-                                          </Link>
-                                        )}
-                                        {/* Invoice link (primary) */}
-                                        <Link
-                                          href={`/invoice/${r.id}/specific/${inv.id}`}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="mt-2 inline-block px-2 py-1 rounded-md bg-blue-600 text-white text-xs font-medium shadow hover:bg-blue-700 transition"
-                                        >
-                                          View Invoice →
-                                        </Link>
-                                      </div>
-                                    </div>
-                                  ))}
-
+                                <div className="text-green-700 font-medium">
+                                  Tax Invoice
                                 </div>
-                              );
-                            }
+                              </div>
+                            );
 
-                            // CASE 3 → fully paid invoice
-                            if (latest?.status === "paid") {
-                              return (
-                                <div className="space-y-1 text-xs">
-                                  <div className="font-medium text-green-700">Paid</div>
-                                  <div className="text-gray-700">
-                                    {latest.paymentDate?.split("T")[0]}
-                                  </div>
-                                  <div className="text-gray-500 italic">Tax Invoice</div>
-                                </div>
-                              );
-                            }
-
-                            return null;
                           })()}
-
                         </td>
 
                         {/* INITIAL CHURN (dummy) */}
@@ -1006,61 +986,60 @@ export default function Customers({ onDone }: { onDone: () => void }) {
 
                         {/* PAID */}
                         <td className="p-4 border-r text-center leading-5">
-
-                          {/* still loading or no invoices */}
-                          {(!r.invoices || r.invoices.length === 0) && "—"}
-
                           {(() => {
                             const invoices = r.invoices || [];
-                            const latest = invoices.at(-1);
-                            const partials = invoices.filter((inv: any) => inv.status === "partially paid");
+                            if (invoices.length === 0) {
+                              return <span className="text-gray-400">—</span>;
+                            }
 
-                            // CASE 1 → no payments yet (pending only)
-                            if (latest?.status === "pending" && partials.length === 0) {
+                            const latest = invoices.at(-1);
+                            const status = latest?.status?.toLowerCase().trim();
+                            const partials = invoices.filter((inv: any) =>
+                              inv.status?.toLowerCase().trim() === "partially paid"
+                            );
+
+                            // ⭐ Fully Paid
+                            if (status === "paid") {
                               return (
-                                <div className="text-gray-600 text-sm italic">
-                                  No payments made yet
+                                <div className="space-y-1 text-xs text-center">
+                                  <div className="font-semibold text-green-700">Fully Paid ✓</div>
+                                  <div className="text-gray-800">
+                                    {latest.paymentDate?.split("T")[0] ?? "—"}
+                                  </div>
+                                  <div className="text-green-700 font-medium">
+                                    Tax Invoice
+                                  </div>
                                 </div>
                               );
                             }
 
-                            // CASE 2 → there are partial payments → show all of them
-                            if (partials.length > 0) {
+                            // ⭐ Partially Paid
+                            if (partials.length > 0 || status === "partially paid") {
                               return (
                                 <div className="space-y-2">
-
-                                  {partials.map((inv: any, i: number) => (
+                                  {partials.map((inv: any, index: number) => (
                                     <div
-                                      key={i}
-                                      className="bg-orange-50 border border-orange-200 rounded p-2 text-xs shadow-sm"
+                                      key={index}
+                                      className="bg-orange-50 border border-orange-200 rounded-md p-2 text-xs shadow-sm text-left"
                                     >
-                                      <div className="font-medium text-orange-700">
-                                        Partially paid: ₹{inv.partialAmount}/-
+                                      <div className="font-semibold text-orange-700">
+                                        Paid: ₹{inv.partialAmount}/-
+                                      </div>
+                                      <div className="text-gray-800">
+                                        Date: {inv.paymentDate?.split("T")[0] ?? "—"}
                                       </div>
 
-                                      <div className="text-gray-700">
-                                        Date: {inv.paymentDate?.split("T")[0]}
-                                      </div>
-
-                                      {/* Notes */}
                                       {inv.paymentNotes && (
-                                        <div className="text-gray-600 italic mt-1">
+                                        <div className="text-gray-600 italic">
                                           {inv.paymentNotes}
                                         </div>
                                       )}
 
-                                      {/* Remaining Amount */}
-                                      {inv.remainingAmount !== null && (
-                                        <div
-                                          className={`font-semibold mt-1 
-                                          ${inv.remainingAmount > 0 ? "text-red-600" : "text-green-700"}`}
-                                        >
-                                          Remaining: ₹{Math.max(0, inv.remainingAmount)}/-
-                                        </div>
-                                      )}
+                                      <div className="font-semibold mt-1 text-red-600">
+                                        Remaining: ₹{Math.max(0, inv.remainingAmount)}/-
+                                      </div>
 
-                                      <div className="flex flex-col items-center justify-center mt-1">
-                                        {/* Receipt link (secondary) */}
+                                      <div className="py-1">
                                         {inv.paymentFileUrl && (
                                           <Link
                                             href={inv.paymentFileUrl}
@@ -1071,40 +1050,24 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                                             📄 View Receipt
                                           </Link>
                                         )}
-                                        {/* Invoice link (primary) */}
-                                        <Link
-                                          href={`/invoice/${r.id}/specific/${inv.id}`}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="mt-2 inline-block px-2 py-1 rounded-md bg-blue-600 text-white text-xs font-medium shadow hover:bg-blue-700 transition"
-                                        >
-                                          View Invoice →
-                                        </Link>
                                       </div>
-
                                     </div>
                                   ))}
-
                                 </div>
                               );
                             }
 
-                            // CASE 3 → fully paid invoice
-                            if (latest?.status === "paid") {
+                            // ⭐ No payments yet (Only Pending invoice exists)
+                            if (status === "pending") {
                               return (
-                                <div className="space-y-1 text-xs">
-                                  <div className="font-medium text-green-700">Paid</div>
-                                  <div className="text-gray-700">
-                                    {latest.paymentDate?.split("T")[0]}
-                                  </div>
-                                  <div className="text-gray-500 italic">Tax Invoice</div>
+                                <div className="text-gray-600 text-xs italic">
+                                  No payments made yet
                                 </div>
                               );
                             }
 
-                            return null;
+                            return <span className="text-gray-400">—</span>;
                           })()}
-
                         </td>
 
                         {/* CHURN (dummy) */}
@@ -1210,29 +1173,37 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                       </p>
                     )}
 
-                    {currentPlan.fixedPrice && (
+                    {currentPlan.planType === "fixed" ? (
                       <p>
                         <span className="font-medium text-gray-700">Fixed Price:</span>{" "}
                         ₹{currentPlan.fixedPrice}
                       </p>
+                    ) : (
+                      <p>
+                        <span className="font-medium text-gray-700">Base Price:</span>{" "}
+                        ₹{currentPlan.basePrice}
+                      </p>
                     )}
 
-                    <p>
-                      <span className="font-medium text-gray-700">Base Price:</span>{" "}
-                      ₹{currentPlan.basePrice}
-                    </p>
+                    {currentPlan.planType !== "fixed" && (
+                      <p>
+                        <span className="font-medium text-gray-700">Credits Included:</span>{" "}
+                        {currentPlan.creditsIncluded}
+                      </p>
+                    )}
 
-                    <p>
-                      <span className="font-medium text-gray-700">Credits Included:</span>{" "}
-                      {currentPlan.creditsIncluded}
-                    </p>
-
-                    {currentPlan.validity && (
+                    {currentPlan.planType === "fixed" ? (
+                      <p>
+                        <span className="font-medium text-gray-700">Billing Cycle:</span>{" "}
+                        {currentPlan.billingCycle} months
+                      </p>
+                    ) : (
                       <p>
                         <span className="font-medium text-gray-700">Validity:</span>{" "}
                         {currentPlan.validity} months
                       </p>
                     )}
+
                   </div>
 
                   {currentPlan.planType === "hybrid" && (
@@ -1291,7 +1262,94 @@ export default function Customers({ onDone }: { onDone: () => void }) {
               )}
 
             </div>
-            
+
+            {/* PLAN GRID */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+              {allPlans.map((plan) => (
+                <div
+                  key={plan.id}
+                  className="border rounded-lg p-4 shadow-sm hover:shadow-md transition bg-white flex flex-col justify-between"
+                >
+                  <div>
+
+                    {currentPlan && currentPlan.id === plan.id && (
+                      <div className="mb-3">
+                        <span className="text-[10px] px-2 py-1 bg-green-600 text-white font-semibold rounded-full uppercase tracking-wide">
+                          ✓ Assigned
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-start">
+                      <h3 className="text-lg font-bold text-gray-900">{plan.planName}</h3>
+                      <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded capitalize">
+                        {plan.planType}
+                      </span>
+                    </div>
+
+                    <p className="text-gray-600 text-sm mt-2 mb-3 line-clamp-3">
+                      {plan.description || "No description available"}
+                    </p>
+
+                    <div className="space-y-1 text-sm text-gray-700">
+                      {plan.planType === "fixed" ? (
+                        <p>
+                          <span className="font-medium">Fixed Price:</span> ₹{plan.fixedPrice}
+                        </p>
+                      ) : (
+                        <p>
+                          <span className="font-medium">Base Price:</span> ₹{plan.basePrice}
+                        </p>
+                      )}
+                      {plan.planType !== "fixed" && (
+                        <p>
+                          <span className="font-medium">Credits Included:</span> {plan.creditsIncluded}
+                        </p>
+                      )}
+                      {plan.planType === "fixed" ? (
+                        <p>
+                          <span className="font-medium">Billing Cycle:</span> {plan.billingCycle} months
+                        </p>
+                      ) : (
+                        <p>
+                          <span className="font-medium">Validity:</span> {plan.validity} months
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex gap-2">                    
+                    <button
+                      onClick={() => handleAssignPlan(selectedRestaurant?.id, plan.id)}
+                      disabled={(currentPlan && currentPlan.id === plan.id) || assigningPlan}
+                      className={`
+                        flex-1 py-2 rounded text-sm font-medium transition
+                        ${currentPlan && currentPlan.id === plan.id 
+                          ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                          : (assigningPlan && assigningPlanId === plan.id) 
+                          ? "text-gray-600 bg-gray-300 cursor-not-allowed"
+                          : "bg-green-600 text-white hover:bg-green-700 cursor-pointer"
+                        }
+                      `}
+                    >
+                      {assigningPlan && assigningPlanId === plan.id ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                          Updating…
+                        </span>
+                      ) : currentPlan && currentPlan.id === plan.id ? (
+                        <span>Already Assigned</span>
+                      ) : (
+                        <span>Assign This Plan</span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+            </div>
+
             {/* TAX SETTINGS & TIME TABLE SECTION */}
             <div className="border rounded-lg p-2 bg-gray-50">
               <div className="bg-gray-100 p-4 rounded space-y-3">
@@ -1352,6 +1410,7 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                     className="border p-2 rounded"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
+                    onClick={e => (e.target as HTMLInputElement).showPicker()}
                   />
                 </div>
 
@@ -1433,84 +1492,6 @@ export default function Customers({ onDone }: { onDone: () => void }) {
               </div>
             </div>
 
-            {/* PLAN GRID */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-              {allPlans.map((plan) => (
-                <div
-                  key={plan.id}
-                  className="border rounded-lg p-4 shadow-sm hover:shadow-md transition bg-white flex flex-col justify-between"
-                >
-                  <div>
-
-                    {currentPlan && currentPlan.id === plan.id && (
-                      <div className="mb-3">
-                        <span className="text-[10px] px-2 py-1 bg-green-600 text-white font-semibold rounded-full uppercase tracking-wide">
-                          ✓ Assigned
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="flex justify-between items-start">
-                      <h3 className="text-lg font-bold text-gray-900">{plan.planName}</h3>
-                      <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded capitalize">
-                        {plan.planType}
-                      </span>
-                    </div>
-
-                    <p className="text-gray-600 text-sm mt-2 mb-3 line-clamp-3">
-                      {plan.description || "No description available"}
-                    </p>
-
-                    <div className="space-y-1 text-sm text-gray-700">
-                      {plan.planType === "hybrid" && (
-                        <p>
-                          <span className="font-medium">Top-up Price (Metered):</span> ₹{plan.fixedPrice}
-                        </p>
-                      )}
-                      <p>
-                        <span className="font-medium">Base Price:</span> ₹{plan.basePrice}
-                      </p>
-                      <p>
-                        <span className="font-medium">Credits Included:</span> {plan.creditsIncluded}
-                      </p>
-                      <p>
-                        <span className="font-medium">Validity:</span> {plan.validity} months
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex gap-2">                    
-                    <button
-                      onClick={() => handleAssignPlan(selectedRestaurant?.id, plan.id)}
-                      disabled={(currentPlan && currentPlan.id === plan.id) || assigningPlan}
-                      className={`
-                        flex-1 py-2 rounded text-sm font-medium transition
-                        ${currentPlan && currentPlan.id === plan.id 
-                          ? "bg-gray-300 text-gray-600 cursor-not-allowed"
-                          : (assigningPlan && assigningPlanId === plan.id) 
-                          ? "text-white bg-green-700 cursor-not-allowed"
-                          : "bg-green-600 text-white hover:bg-green-700 cursor-pointer"
-                        }
-                      `}
-                    >
-                      {assigningPlan && assigningPlanId === plan.id ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                          Updating…
-                        </span>
-                      ) : currentPlan && currentPlan.id === plan.id ? (
-                        <span>Already Assigned</span>
-                      ) : (
-                        <span>Assign This Plan</span>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-            </div>
-
             {allPlans.length === 0 && (
               <p className="text-center text-gray-500 py-6">No pricing plans available.</p>
             )}
@@ -1532,20 +1513,94 @@ export default function Customers({ onDone }: { onDone: () => void }) {
               {error && (
                 <p className="text-sm text-red-600 font-medium">{error}</p>
               )}
+              
+              {/* Payment Summary */}
+              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-gray-900">Payment Summary</h2>
+                  <span
+                    className={`px-2 py-1 text-xs rounded-md font-medium capitalize ${
+                      currentRestaurant[0]?.invoices?.at(-1)?.status === "paid"
+                        ? "bg-green-50 text-green-600"
+                        : currentRestaurant[0]?.invoices?.at(-1)?.status === "partially paid"
+                        ? "bg-yellow-50 text-yellow-600"
+                        : "bg-red-50 text-red-600"
+                    }`}
+                  >
+                    {currentRestaurant[0]?.invoices?.at(-1)?.status || "pending"}
+                  </span>
+                </div>
+
+                {/* Info Rows */}
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="flex flex-col">
+                    <span className="text-gray-500">Restaurant</span>
+                    <span className="text-gray-900 font-medium">
+                      {currentRestaurant[0]?.name || "—"}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <span className="text-gray-500">Pricing Plan</span>
+                    <span className="text-gray-900 font-medium">
+                      {currentRestaurant[0]?.restaurantPricingPlans?.[0]?.pricingPlan?.planName || "—"}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <span className="text-gray-500">Total Amount</span>
+                    <span className="text-gray-900 font-semibold">
+                      {currentRestaurant[0]?.invoices?.at(-1)?.totalAmount?.toLocaleString() ?? "0"}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <span className="text-gray-500">Paid Amount</span>
+                    <span className="text-green-700 font-semibold">
+                      {currentRestaurant[0]?.invoices?.at(-1)?.paidAmount?.toLocaleString() ?? "0"}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <span className="text-gray-500">Remaining</span>
+                    <span className="text-red-600 font-bold">
+                      {currentRestaurant[0]?.invoices?.at(-1)?.remainingAmount?.toLocaleString() ?? "0"}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <span className="text-gray-500">Due Date</span>
+                    <span className="text-gray-900 font-medium text-xs">
+                      {currentRestaurant[0]?.invoices?.at(-1)?.dueDate?.slice(0, 10) || "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
 
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-gray-700">Payment Date</label>
+                <label className="text-sm font-medium text-gray-700">
+                  Payment Date
+                  <span className="ml-1 text-xs text-blue-600 font-normal">
+                    (required)
+                  </span>
+                </label>
                 <input
                   type="date"
                   value={paymentDate}
                   onChange={(e) => setPaymentDate(e.target.value)}
+                  onClick={e => (e.target as HTMLInputElement).showPicker()}
                   className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50 focus:bg-white
                   focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
                 />
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-gray-700">Payment Notes</label>
+                <label className="text-sm font-medium text-gray-700">
+                  Payment Notes
+                  <span className="ml-1 text-xs text-blue-600 font-normal">
+                    (optional)
+                  </span>
+                </label>
                 <textarea
                   rows={4}
                   value={paymentNotes}
@@ -1557,7 +1612,12 @@ export default function Customers({ onDone }: { onDone: () => void }) {
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-gray-700">Payment Status</label>
+                <label className="text-sm font-medium text-gray-700">
+                  Payment Status
+                  <span className="ml-1 text-xs text-blue-600 font-normal">
+                    (required)
+                  </span>
+                </label>
                 <div className="flex items-center gap-6">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1602,7 +1662,13 @@ export default function Customers({ onDone }: { onDone: () => void }) {
 
 
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-gray-700">Upload Payment Proof</label>
+                <label className="text-sm font-medium text-gray-700"></label>
+                <label className="text-sm font-medium text-gray-700">
+                  Upload Payment Proof
+                  <span className="ml-1 text-xs text-blue-600 font-normal">
+                    (required)
+                  </span>
+                </label>
                 <input
                   type="file"
                   accept="image/*,application/pdf"
@@ -1649,6 +1715,54 @@ export default function Customers({ onDone }: { onDone: () => void }) {
                 </button>
               </div>
 
+            </div>
+          </div>
+        </div>
+      )}
+      {confirmAssignModal && (
+        <div
+          onClick={() => {
+            setConfirmAssigned(false);
+            setConfirmAssignModal(false);
+          }}
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white w-full max-w-md rounded-2xl shadow-xl p-6 space-y-6 text-center border border-gray-200 animate-slideUp"
+          >
+            {/* Icon */}
+            <div className="text-5xl text-red-600">⚠️</div>
+
+            {/* Text */}
+            <h2 className="text-lg font-bold text-gray-900">
+              Are you sure you want to proceed?
+            </h2>
+            <p className="text-sm text-gray-600 leading-5">
+              This action is irreversible. If needed, please cancel and review before confirming.
+            </p>
+
+            {/* Buttons */}
+            <div className="flex items-center justify-center gap-4 mt-2">
+              <button
+                className="px-5 py-2.5 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100 transition-all"
+                onClick={() => {
+                  setConfirmAssigned(false);
+                  setConfirmAssignModal(false);
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-red-600 text-white shadow hover:bg-red-700 focus:ring-2 focus:ring-red-400 transition-all"
+                onClick={() => {
+                  setConfirmAssigned(true);
+                  setConfirmAssignModal(false);
+                }}
+              >
+                Yes, Confirm
+              </button>
             </div>
           </div>
         </div>

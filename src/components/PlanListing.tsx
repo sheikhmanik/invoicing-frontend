@@ -22,7 +22,7 @@ export default function PlanListing() {
       setFixedPlan(fixedPlan);
       setMeteredPlan(meteredPlan);
       setHybridPlan(hybridPlan);
-      console.log(hybridPlan);
+      console.log(hybridPlan, fixedPlan, meteredPlan);
     })();
   }, []);
 

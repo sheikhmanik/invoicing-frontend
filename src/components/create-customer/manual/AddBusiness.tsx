@@ -13,6 +13,7 @@ export default function AddBusiness({ onDone }: { onDone: () => void }) {
     PrimaryContactPhone: "",
     PrimaryContactEmail: "",
   });
+  const [error, setError] = useState("");
 
   const handleChange = (e: any) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -20,9 +21,40 @@ export default function AddBusiness({ onDone }: { onDone: () => void }) {
 
   const handleSubmit = async () => {
     
-    const missingFields = Object.entries(form).filter(([_, value]) => !value);
-    if (missingFields.length > 0) {
-      alert("Please fill form.");
+    if(!form.name.trim()) {
+      setError("Name is required.");
+      return;
+    }
+    if(!form.address.trim()) {
+      setError("Address is required.");
+      return;
+    }
+    if(!form.location.trim()) {
+      setError("Location is required.");
+      return;
+    }
+    if(!form.GSTIN.trim()) {
+      setError("GSTIN is required.");
+      return;
+    }
+    if(!form.PrimaryContactName.trim()) {
+      setError("Primary Contact Name is required.");
+      return;
+    }
+    if(!form.PrimaryContactPhone.trim()) {
+      setError("Primary Contact Phone is required.");
+      return;
+    }
+    if(!form.PrimaryContactEmail.trim()) {
+      setError("Primary Contact Email is required.");
+      return;
+    }
+    if (!/\S+@\S+\.\S+/.test(form.PrimaryContactEmail.trim())) {
+      alert("Invalid email format.");
+      return;
+    }
+    if (!/^[0-9]{10}$/.test(form.PrimaryContactPhone.trim())) {
+      setError("Primary Contact Phone must be a valid 10-digit number.");
       return;
     }
 
@@ -42,10 +74,19 @@ export default function AddBusiness({ onDone }: { onDone: () => void }) {
       <div className="w-full max-w-lg bg-white rounded-xl shadow-lg p-6">
         <h1 className="text-2xl font-bold mb-6 text-center">Add Business</h1>
 
+        {error && (
+          <p className="text-sm text-red-600 font-medium py-2">{error}</p>
+        )}
+
         <div className="space-y-4">
 
-          <div>
-            <label className="block font-medium mb-1">Name</label>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">
+              Business Name
+              <span className="ml-1 text-xs text-blue-600 font-normal">
+                (required)
+              </span>
+            </label>
             <input
               name="name"
               placeholder="Business Name"
@@ -54,8 +95,13 @@ export default function AddBusiness({ onDone }: { onDone: () => void }) {
             />
           </div>
 
-          <div>
-            <label className="block font-medium mb-1">Address</label>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">
+              Business Address
+              <span className="ml-1 text-xs text-blue-600 font-normal">
+                (required)
+              </span>
+            </label>
             <input
               name="address"
               placeholder="Address"
@@ -64,8 +110,13 @@ export default function AddBusiness({ onDone }: { onDone: () => void }) {
             />
           </div>
 
-          <div>
-            <label className="block font-medium mb-1">Location</label>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">
+              Business Location
+              <span className="ml-1 text-xs text-blue-600 font-normal">
+                (required)
+              </span>
+            </label>
             <input
               name="location"
               placeholder="City / Area"
@@ -74,8 +125,13 @@ export default function AddBusiness({ onDone }: { onDone: () => void }) {
             />
           </div>
 
-          <div>
-            <label className="block font-medium mb-1">GSTIN</label>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">
+              Business GSTIN
+              <span className="ml-1 text-xs text-blue-600 font-normal">
+                (required)
+              </span>
+            </label>
             <input
               name="GSTIN"
               placeholder="GSTIN Number"
@@ -84,8 +140,13 @@ export default function AddBusiness({ onDone }: { onDone: () => void }) {
             />
           </div>
 
-          <div>
-            <label className="block font-medium mb-1">Primary Contact Name</label>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">
+              Primary Contact Name
+              <span className="ml-1 text-xs text-blue-600 font-normal">
+                (required)
+              </span>
+            </label>
             <input
               name="PrimaryContactName"
               placeholder="Full Name"
@@ -94,8 +155,13 @@ export default function AddBusiness({ onDone }: { onDone: () => void }) {
             />
           </div>
 
-          <div>
-            <label className="block font-medium mb-1">Primary Contact Phone</label>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">
+              Primary Contact Phone
+              <span className="ml-1 text-xs text-blue-600 font-normal">
+                (required)
+              </span>
+            </label>
             <input
               name="PrimaryContactPhone"
               placeholder="Phone Number"
@@ -104,8 +170,13 @@ export default function AddBusiness({ onDone }: { onDone: () => void }) {
             />
           </div>
           
-          <div>
-            <label className="block font-medium mb-1">Contact Email Address</label>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">
+              Contact Email Address
+              <span className="ml-1 text-xs text-blue-600 font-normal">
+                (required)
+              </span>
+            </label>
             <input
               name="PrimaryContactEmail"
               placeholder="Type Email Address"
