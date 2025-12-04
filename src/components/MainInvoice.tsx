@@ -284,12 +284,12 @@ export default function ProformaInvoice() {
               return (
                 <tr
                   key={inv.id || index}
-                  className={`text-sm ${
+                  className={`text-sm text-green-700 ${
                     fullyPaid
-                      ? "bg-green-100 font-bold" // ✔ last payment that completed billing
+                      ? "bg-green-50 font-bold" // ✔ last payment that completed billing
                       : isLatest
                       ? "bg-green-50 font-semibold"
-                      : "bg-orange-50"
+                      : "bg-green-50"
                   }`}
                 >
                   <td colSpan={3} className="border p-2 text-right">
@@ -298,7 +298,7 @@ export default function ProformaInvoice() {
                   </td>
 
                   <td className="border p-2 text-center">
-                    ₹{inv.partialAmount}.00/-
+                    {inv.partialAmount}.00/-
                   </td>
                 </tr>
               );

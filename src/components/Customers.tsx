@@ -26,6 +26,16 @@ interface IncludedProduct {
   isActive?: boolean;
 }
 
+interface HybridProduct {
+  id?: number;
+  productId: number;
+  unlimited: boolean;
+  numberOfUnits?: number | string;
+  creditsPerUnit?: number | string;
+  product: Product;
+  isActive?: boolean;
+}
+
 export interface PricingPlan {
   id: number;
   planType: "fixed" | "metered" | "hybrid";
@@ -38,6 +48,7 @@ export interface PricingPlan {
   billingCycle: string;
   meteredProducts: MeteredProduct[];
   includedProducts: IncludedProduct[];
+  hybridProducts: HybridProduct[];
   createdAt?: string;
   invoices: any[];
   restaurantName: string;
@@ -404,7 +415,7 @@ export default function Customers() {
                           <div>
                             <p className="text-gray-500">Total Amount</p>
                             <p className="font-semibold">
-                              ₹{r.invoices?.[r.invoices.length - 1]?.totalAmount ?? "--"}
+                              {r.invoices?.[r.invoices.length - 1]?.totalAmount ?? "--"}
                             </p>
                           </div>
     
@@ -433,15 +444,17 @@ export default function Customers() {
                             >
                               Invoice
                             </Link>
-                            <button
-                              onClick={() => {
-                                serCurrentResId(r.id)
-                                setUpdatePayment(true)
-                              }}
-                              className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
-                            >
-                              Update Payment
-                            </button>
+                            {r.invoices.at(-1)?.status !== "paid" && (
+                              <button
+                                onClick={() => {
+                                  serCurrentResId(r.id)
+                                  setUpdatePayment(true)
+                                }}
+                                className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                              >
+                                Update Payment
+                              </button>
+                            )}
                           </div>
     
                         </td>
@@ -497,7 +510,7 @@ export default function Customers() {
                                       className="bg-orange-50 border border-orange-200 rounded-md p-2 text-xs shadow-sm text-left"
                                     >
                                       <div className="font-semibold text-orange-700">
-                                        Paid: ₹{inv.partialAmount}/-
+                                        Paid: {inv.partialAmount}/-
                                       </div>
                                       <div className="text-gray-800">
                                         Date: {inv.paymentDate?.split("T")[0] ?? "—"}
@@ -510,7 +523,7 @@ export default function Customers() {
                                       )}
 
                                       <div className="font-semibold mt-1 text-red-600">
-                                        Remaining: ₹{Math.max(0, inv.remainingAmount)}/-
+                                        Remaining: {Math.max(0, inv.remainingAmount)}/-
                                       </div>
 
                                       <div className="py-1 flex flex-col gap-1">
@@ -569,18 +582,6 @@ export default function Customers() {
                         {/* UPDATE ACTIONS */}
                         <td className="p-4 text-center space-y-2">
                           -
-                          {/* <button className="block w-full text-xs py-1.5 border border-gray-300 rounded-md bg-gray-50">
-                            Pause Subscription
-                          </button>
-                          <button className="block w-full text-xs py-1.5 border border-gray-300 rounded-md bg-gray-50">
-                            Paid Confirmation
-                          </button>
-                          <button className="block w-full text-xs py-1.5 border border-gray-300 rounded-md bg-gray-50">
-                            Reference Receipt
-                          </button>
-                          <button className="block w-full text-xs py-1.5 border border-gray-300 rounded-md bg-gray-50">
-                            Extend License
-                          </button> */}
                         </td>
                       </tr>
                     ))}
@@ -670,7 +671,7 @@ export default function Customers() {
                           <div>
                             <p className="text-gray-500">Total Amount</p>
                             <p className="font-semibold">
-                              ₹{r.invoices?.[r.invoices.length - 1]?.totalAmount ?? "--"}
+                              {r.invoices?.[r.invoices.length - 1]?.totalAmount ?? "--"}
                             </p>
                           </div>
 
@@ -699,15 +700,6 @@ export default function Customers() {
                             >
                               Invoice
                             </Link>
-                            <button
-                              onClick={() => {
-                                serCurrentResId(r.id)
-                                setUpdatePayment(true)
-                              }}
-                              className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
-                            >
-                              Update Payment
-                            </button>
                           </div>
 
                         </td>
@@ -729,7 +721,7 @@ export default function Customers() {
                                 >
                                   <div className="flex justify-between">
                                     <span className="font-semibold text-gray-700">
-                                      Paid: ₹{inv.partialAmount ?? 0}/-
+                                      Paid: {inv.partialAmount ?? 0}/-
                                     </span>
                                     <span className="text-gray-500">
                                       {inv.paymentDate?.split("T")[0] || "—"}
@@ -744,7 +736,7 @@ export default function Customers() {
                                   )}
 
                                   {/* Document */}
-                                  {inv.paymentFileUrl ? (
+                                  <div className="flex flex-col gap-1">
                                     <Link
                                       href={inv.paymentFileUrl}
                                       target="_blank"
@@ -753,9 +745,19 @@ export default function Customers() {
                                     >
                                       📄 View Receipt
                                     </Link>
-                                  ) : (
-                                    <span className="text-gray-400">No file</span>
-                                  )}
+                                    <Link
+                                      href={`/invoice/${r.id}/specific/${inv.id}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="
+                                        inline-flex items-center gap-1 px-2 py-1 rounded
+                                        bg-blue-500 text-white text-[10px] font-medium
+                                        hover:bg-blue-600 shadow-sm hover:shadow transition-all
+                                      "
+                                    >
+                                      Invoice →
+                                    </Link>
+                                  </div>
                                 </div>
                               ))}
 
@@ -913,7 +915,7 @@ export default function Customers() {
                           <div>
                             <p className="text-gray-500">Total Amount</p>
                             <p className="font-semibold">
-                              ₹{r.invoices?.[r.invoices.length - 1]?.totalAmount ?? "--"}
+                              {r.invoices?.[r.invoices.length - 1]?.totalAmount ?? "--"}
                             </p>
                           </div>
 
@@ -998,6 +1000,8 @@ export default function Customers() {
                               inv.status?.toLowerCase().trim() === "partially paid"
                             );
 
+                            console.log("STATUS:", status, "LATEST:", latest, "PARTIALS:", partials);
+
                             // ⭐ Fully Paid
                             if (status === "paid") {
                               return (
@@ -1023,7 +1027,7 @@ export default function Customers() {
                                       className="bg-orange-50 border border-orange-200 rounded-md p-2 text-xs shadow-sm text-left"
                                     >
                                       <div className="font-semibold text-orange-700">
-                                        Paid: ₹{inv.partialAmount}/-
+                                        Paid: {inv.partialAmount}/-
                                       </div>
                                       <div className="text-gray-800">
                                         Date: {inv.paymentDate?.split("T")[0] ?? "—"}
@@ -1036,20 +1040,32 @@ export default function Customers() {
                                       )}
 
                                       <div className="font-semibold mt-1 text-red-600">
-                                        Remaining: ₹{Math.max(0, inv.remainingAmount)}/-
+                                        Remaining: {Math.max(0, inv.remainingAmount)}/-
                                       </div>
 
-                                      <div className="py-1">
+                                      <div className="py-1 flex flex-col gap-1">
                                         {inv.paymentFileUrl && (
                                           <Link
                                             href={inv.paymentFileUrl}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 text-gray-600 text-sm underline hover:text-gray-800 transition"
+                                            className="inline-flex items-center gap-1 text-gray-600 text-xs underline hover:text-gray-800 transition"
                                           >
                                             📄 View Receipt
                                           </Link>
                                         )}
+                                        <Link
+                                          href={`/invoice/${r.id}/specific/${inv.id}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="
+                                            inline-flex items-center gap-1 px-2 py-1 rounded
+                                            bg-blue-500 text-white text-[10px] font-medium
+                                            hover:bg-blue-600 shadow-sm hover:shadow transition-all
+                                          "
+                                        >
+                                          Invoice →
+                                        </Link>
                                       </div>
                                     </div>
                                   ))}
@@ -1078,18 +1094,6 @@ export default function Customers() {
                         {/* UPDATE ACTIONS */}
                         <td className="p-4 text-center space-y-2">
                           -
-                          {/* <button className="block w-full text-xs py-1.5 border border-gray-300 rounded-md bg-gray-50">
-                            Pause Subscription
-                          </button>
-                          <button className="block w-full text-xs py-1.5 border border-gray-300 rounded-md bg-gray-50">
-                            Paid Confirmation
-                          </button>
-                          <button className="block w-full text-xs py-1.5 border border-gray-300 rounded-md bg-gray-50">
-                            Reference Receipt
-                          </button>
-                          <button className="block w-full text-xs py-1.5 border border-gray-300 rounded-md bg-gray-50">
-                            Extend License
-                          </button> */}
                         </td>
                       </tr>
                     ))}
@@ -1176,16 +1180,16 @@ export default function Customers() {
                     {currentPlan.planType === "fixed" ? (
                       <p>
                         <span className="font-medium text-gray-700">Fixed Price:</span>{" "}
-                        ₹{currentPlan.fixedPrice}
+                        {currentPlan.fixedPrice}
                       </p>
                     ) : (
                       <p>
                         <span className="font-medium text-gray-700">Base Price:</span>{" "}
-                        ₹{currentPlan.basePrice}
+                        {currentPlan.basePrice}
                       </p>
                     )}
 
-                    {currentPlan.planType !== "fixed" && (
+                    {currentPlan.planType === "metered" && (
                       <p>
                         <span className="font-medium text-gray-700">Credits Included:</span>{" "}
                         {currentPlan.creditsIncluded}
@@ -1206,7 +1210,7 @@ export default function Customers() {
 
                   </div>
 
-                  {currentPlan.planType === "hybrid" && (
+                  {currentPlan.planType === "fixed" && (
                     <div>
                       <h3 className="text-sm font-semibold text-gray-800 mt-2">Included Products</h3>
 
@@ -1217,6 +1221,29 @@ export default function Customers() {
                           {currentPlan.includedProducts?.map((prod, idx) => (
                             <div
                               key={prod.productId + "-included-" + idx}
+                              className="p-3 bg-white border rounded-lg shadow-sm flex justify-between"
+                            >
+                              <div className="text-sm font-medium text-gray-800">
+                                {prod.product?.name}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {currentPlan.planType === "metered" && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-800 mt-2">Metered Products</h3>
+
+                      {(currentPlan.meteredProducts?.length === 0 || !currentPlan.meteredProducts) ? (
+                        <p className="text-gray-500 text-sm">No metered products found.</p>
+                      ) : (
+                        <div className="space-y-3 mt-2">
+                          {currentPlan.meteredProducts?.map((prod, idx) => (
+                            <div
+                              key={prod.productId + "-metered-" + idx}
                               className="p-3 bg-white border rounded-lg shadow-sm flex justify-between"
                             >
                               <div className="text-sm font-medium text-gray-800">
@@ -1233,30 +1260,29 @@ export default function Customers() {
                     </div>
                   )}
 
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-800 mt-2">Metered Products</h3>
+                  {currentPlan.planType === "hybrid" && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-800 mt-2">Hybrid Products</h3>
 
-                    {(currentPlan.meteredProducts?.length === 0 || !currentPlan.meteredProducts) ? (
-                      <p className="text-gray-500 text-sm">No metered products found.</p>
-                    ) : (
-                      <div className="space-y-3 mt-2">
-                        {currentPlan.meteredProducts?.map((prod, idx) => (
-                          <div
-                            key={prod.productId + "-metered-" + idx}
-                            className="p-3 bg-white border rounded-lg shadow-sm flex justify-between"
-                          >
-                            <div className="text-sm font-medium text-gray-800">
-                              {prod.product?.name}
+                      {currentPlan.hybridProducts?.length === 0 || !currentPlan.hybridProducts ? (
+                        <p className="text-gray-500 text-sm">No Hybrid products found.</p>
+                      ) : (
+                        <div className="space-y-3 mt-2">
+                          {currentPlan.hybridProducts?.map((prod, idx) => (
+                            <div
+                              key={prod.productId + "-included-" + idx}
+                              className="p-3 bg-white border rounded-lg shadow-sm flex justify-between"
+                            >
+                              <div className="text-sm font-medium text-gray-800">
+                                {prod.product?.name}
+                              </div>
                             </div>
-                            <div className="text-sm text-gray-600">
-                              Credits:{" "}
-                              <span className="font-semibold">{prod.credits}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
 
                 </div>
               )}
@@ -1295,14 +1321,14 @@ export default function Customers() {
                     <div className="space-y-1 text-sm text-gray-700">
                       {plan.planType === "fixed" ? (
                         <p>
-                          <span className="font-medium">Fixed Price:</span> ₹{plan.fixedPrice}
+                          <span className="font-medium">Fixed Price:</span> {plan.fixedPrice}
                         </p>
                       ) : (
                         <p>
-                          <span className="font-medium">Base Price:</span> ₹{plan.basePrice}
+                          <span className="font-medium">Base Price:</span> {plan.basePrice}
                         </p>
                       )}
-                      {plan.planType !== "fixed" && (
+                      {plan.planType === "metered" && (
                         <p>
                           <span className="font-medium">Credits Included:</span> {plan.creditsIncluded}
                         </p>
@@ -1509,10 +1535,6 @@ export default function Customers() {
             className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 space-y-6"
           >
             <div className="flex flex-col gap-6 w-full p-6 rounded-lg shadow-sm border border-gray-200">
-
-              {error && (
-                <p className="text-sm text-red-600 font-medium">{error}</p>
-              )}
               
               {/* Payment Summary */}
               <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-4">
@@ -1576,6 +1598,10 @@ export default function Customers() {
                   </div>
                 </div>
               </div>
+
+              {error && (
+                <p className="text-sm text-red-600 font-medium">{error}</p>
+              )}
 
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium text-gray-700">
@@ -1662,7 +1688,6 @@ export default function Customers() {
 
 
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-gray-700"></label>
                 <label className="text-sm font-medium text-gray-700">
                   Upload Payment Proof
                   <span className="ml-1 text-xs text-blue-600 font-normal">

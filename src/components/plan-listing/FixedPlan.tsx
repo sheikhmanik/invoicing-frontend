@@ -24,7 +24,7 @@ export default function FixedPlanPage({ fixed }: { fixed: any[] }) {
 
             <div>
               <p className="font-semibold">Fixed Price</p>
-              <p>₹ {plan.fixedPrice}</p>
+              <p> {plan.fixedPrice}</p>
             </div>
 
             <div>

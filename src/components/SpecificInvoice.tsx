@@ -230,34 +230,34 @@ export default function SpecificInvoice() {
               {subscriptionPeriod}
             </td>
             <td className="border p-2 text-center">
-              ₹{subTotalAmount}.00/-
+              {subTotalAmount}.00/-
             </td>
             <td className="border p-2 text-center">
-              ₹{subTotalAmount}.00/-
+              {subTotalAmount}.00/-
             </td>
           </tr>
 
           <tr>
             <td colSpan={3} className="border p-2 text-right font-semibold">Subtotal</td>
-            <td className="border p-2 text-center">₹{subTotalAmount}.00/-</td>
+            <td className="border p-2 text-center">{subTotalAmount}.00/-</td>
           </tr>
 
           {restaurant.restaurantPricingPlans[0].cgst && (
             <tr>
               <td colSpan={3} className="border p-2 text-right">CGST (9%)</td>
-              <td className="border p-2 text-center">₹{Number(subTotalAmount * 0.09)}.00/-</td>
+              <td className="border p-2 text-center">{Number(subTotalAmount * 0.09)}.00/-</td>
             </tr>
           )}
           {restaurant.restaurantPricingPlans[0].sgst && (
             <tr>
               <td colSpan={3} className="border p-2 text-right">SGST (9%)</td>
-              <td className="border p-2 text-center">₹{Number(subTotalAmount * 0.09)}.00/-</td>
+              <td className="border p-2 text-center">{Number(subTotalAmount * 0.09)}.00/-</td>
             </tr>
           )}
           {restaurant.restaurantPricingPlans[0].igst && (
             <tr>
               <td colSpan={3} className="border p-2 text-right">IGST (18%)</td>
-              <td className="border p-2 text-center">₹{Number(subTotalAmount * 0.18)}.00/-</td>
+              <td className="border p-2 text-center">{Number(subTotalAmount * 0.18)}.00/-</td>
             </tr>
           )}
 
@@ -265,7 +265,7 @@ export default function SpecificInvoice() {
             <td colSpan={3} className="border p-2 text-right">
               Total — {amountInWords}
             </td>
-            <td className="border p-2 text-center">₹{totalAmount}.00/-</td>
+            <td className="border p-2 text-center">{totalAmount}.00/-</td>
           </tr>
           
           {/* PAYMENT HISTORY UP TO THIS INVOICE */}
@@ -295,11 +295,11 @@ export default function SpecificInvoice() {
             return paymentHistory.map((inv, i) => (
               <tr key={i} className="bg-green-50 font-medium">
                 <td colSpan={3} className="border p-2 text-right text-green-700">
-                  {inv.status === "paid" ? "Paid" : "Partially Paid"} — {inv.paymentDate?.split("T")[0] || "—"}
+                  {inv.status === "paid" ? "Fully Paid" : "Partially Paid"} — {inv.paymentDate?.split("T")[0] || "—"}
                 </td>
 
                 <td className="border p-2 text-center text-green-700">
-                  ₹{inv.partialAmount}.00/-
+                  {inv.partialAmount}.00/-
                 </td>
               </tr>
             ));
@@ -310,16 +310,16 @@ export default function SpecificInvoice() {
             const specificInv = restaurant.invoices.find(inv => inv.id === specificInvId);
             if (!specificInv) return null;
 
-            return specificInv.remainingAmount > 0 ? (
+            return (
               <tr className="bg-red-50 font-semibold">
                 <td colSpan={3} className="border p-2 text-right text-red-700">
                   Remaining Amount Due
                 </td>
                 <td className="border p-2 text-center text-red-700">
-                  ₹{Math.max(specificInv.remainingAmount, 0)}.00/-
+                  {Math.max(specificInv.remainingAmount, 0)}.00/-
                 </td>
               </tr>
-            ) : null;
+            );
           })()}
 
         </tbody>

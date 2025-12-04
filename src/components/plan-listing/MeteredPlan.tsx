@@ -19,7 +19,7 @@ export default function MeteredPlanPage({ metered }: { metered: any[] }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-gray-700">
             <div>
               <p className="font-semibold">Base Price</p>
-              <p>₹ {plan.basePrice}</p>
+              <p> {plan.basePrice}</p>
             </div>
 
             <div>

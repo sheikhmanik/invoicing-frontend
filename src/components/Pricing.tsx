@@ -26,6 +26,16 @@ interface IncludedProduct {
   isActive?: boolean;
 }
 
+interface HybridProduct {
+  id?: number;
+  productId: number;
+  unlimitedUsage: boolean;
+  numberOfUnits: number | string;
+  creditsPerUnit: number | string;
+  product: Product;
+  isActive?: boolean;
+}
+
 export interface PricingPlan {
   id?: number;
   planType: "fixed" | "metered" | "hybrid";
@@ -33,11 +43,13 @@ export interface PricingPlan {
   description: string;
   fixedPrice?: number | string | null;
   basePrice?: number | string;
+  pricePerCredit: number | string;
   creditsIncluded: number | string;
   billingCycle: number;
   validity: number;
   meteredProducts: MeteredProduct[];
   includedProducts: IncludedProduct[];
+  hybridProducts: HybridProduct[];
   createdAt?: string;
 }
 
@@ -47,7 +59,7 @@ export default function Pricing() {
 
   const [allPlans, setAllPlans] = useState<PricingPlan[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [productType, setProductType] = useState<"included" | "metered">("metered");
+  const [productType, setProductType] = useState<"included" | "metered" | "hybrid">("metered");
 
   const [currentPlan, setCurrentPlan] = useState<PricingPlan | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
@@ -64,11 +76,13 @@ export default function Pricing() {
     description: "",
     fixedPrice: "",
     basePrice: "",
+    pricePerCredit: "",
     creditsIncluded: "",
     billingCycle: 6,
     validity: 6,
     meteredProducts: [],
     includedProducts: [],
+    hybridProducts: [],
   });
 
   // load plans
@@ -149,6 +163,17 @@ export default function Pricing() {
             isActive: ipFromServer?.isActive ?? true
           });
         }
+
+        if (productType === "hybrid") {
+          cloned.hybridProducts.push({
+            productId: createdProduct.id,
+            unlimitedUsage: false,
+            numberOfUnits: 0,
+            creditsPerUnit: 0,
+            product: createdProduct,
+            isActive: true
+          });
+        }
       
         return cloned;
       });
@@ -171,7 +196,7 @@ export default function Pricing() {
   const handleSavePlan = async () => {
     if (!currentPlan) return alert("No plan to save");
 
-    const { planName, planType, description, fixedPrice, basePrice, creditsIncluded, billingCycle, validity } = currentPlan;
+    const { planName, planType, fixedPrice, basePrice, pricePerCredit, creditsIncluded, billingCycle, validity } = currentPlan;
 
     if (!planName || !planType) {
       return alert("Please fill required fields.");
@@ -185,7 +210,7 @@ export default function Pricing() {
       return alert("Please include price, credits, and validity.");
     }
 
-    if ( planType === "hybrid" && (!fixedPrice || !billingCycle || !basePrice || !creditsIncluded || !validity)) {
+    if ( planType === "hybrid" && (!billingCycle || !basePrice || !pricePerCredit)) {
       return alert("Please fill required fields.");
     }
 
@@ -198,19 +223,33 @@ export default function Pricing() {
       creditsIncluded: Number(currentPlan.creditsIncluded),
       billingCycle: currentPlan.planType !== "metered" ? currentPlan.billingCycle : null,
       validity: currentPlan.planType !== "fixed" ? currentPlan.validity : null,
+      pricePerCredit:
+        currentPlan.planType === "hybrid"
+          ? Number(currentPlan.pricePerCredit)
+          : null,
       includedProducts:
-        currentPlan.planType !== "metered"
+        currentPlan.planType === "fixed"
           ? currentPlan.includedProducts.map(ip => ({
               productId: ip.productId,
               license: ip.product?.license ?? null,
             }))
           : [],
       meteredProducts:
-        currentPlan.planType !== "fixed"
+        currentPlan.planType === "metered"
           ? currentPlan.meteredProducts.map(mu => ({
               productId: mu.productId,
               credits: Number(mu.credits) ?? 0,
               license: mu.product?.license ?? null,
+            }))
+          : [],
+      hybridProducts:
+        currentPlan.planType === "hybrid"
+          ? currentPlan.hybridProducts.map(hp => ({
+              productId: hp.productId,
+              unlimitedUsage: hp.unlimitedUsage,
+              numberOfUnits: hp.unlimitedUsage ? null : Number(hp.numberOfUnits) ?? 0,
+              creditsPerUnit: hp.unlimitedUsage ? null : Number(hp.creditsPerUnit) ?? 0,
+              license: hp.product?.license ?? null,
             }))
           : [],
     };
@@ -219,6 +258,8 @@ export default function Pricing() {
     if (!isCreatingNew && currentPlan.id) payload.planId = currentPlan.id;
 
     try {
+      console.log(payload);
+      // return;
       const res = await axios.post(`${API}/pricing-plan`, payload);
       const savedPlan = res.data?.plan ?? res.data?.planId ?? null;
 
@@ -247,13 +288,17 @@ export default function Pricing() {
   };
 
   const availableMeteredProducts = allProducts.filter(
-    p => !currentPlan?.meteredProducts.some(mp => mp.productId === p.id)
+    p => !currentPlan?.meteredProducts?.some(mp => mp.productId === p.id)
   );
   const availableIncludedProducts = allProducts.filter(
-    p => !currentPlan?.includedProducts.some(ip => ip.productId === p.id)
+    p => !currentPlan?.includedProducts?.some(ip => ip.productId === p.id)
+  );
+  
+  const availableHybridProducts = allProducts.filter(
+    p => !currentPlan?.hybridProducts?.some(ip => ip.productId === p.id)
   );
 
-  const attachProductToPlan = (product: Product, productType: "metered" | "included") => {
+  const attachProductToPlan = (product: Product, productType: "metered" | "included" | "hybrid") => {
     if (productType === "metered") {
       setCurrentPlan(prev => ({
         ...prev!,
@@ -282,25 +327,29 @@ export default function Pricing() {
         ]
       }));
     }
-  };
-
-  const updateMeteredCredit = (idx: number, value: string) => {
-    setCurrentPlan(prev => {
-      if (!prev) return prev;
-      const next = {
-        ...prev,
-        meteredProducts: prev.meteredProducts.map((item, i) =>
-          i === idx ? { ...item, credits: value } : item
-        ),
-      };
-      return next;
-    });
+    if (productType === "hybrid") {
+      setCurrentPlan(prev => ({
+        ...prev!,
+        hybridProducts: [
+          ...(prev!.hybridProducts ?? []),
+          {
+            productId: product.id,
+            unlimitedUsage: false,
+            numberOfUnits: 0,
+            creditsPerUnit: 0,
+            product,
+            isActive: true
+          }
+        ]
+      }));
+    }
   };
 
   const deepClonePlan = (p: PricingPlan): PricingPlan => ({
     ...p,
     meteredProducts: p.meteredProducts.map(mp => ({ ...mp })),
     includedProducts: p.includedProducts.map(ip => ({ ...ip })),
+    hybridProducts: p.hybridProducts.map(hp => ({ ...hp })),
   });
 
   useEffect(() => {
@@ -363,16 +412,15 @@ export default function Pricing() {
                   const isHybrid = plan.planType === "hybrid";
 
                   const priceDisplay = isFixed
-                    ? `₹ ${plan.fixedPrice}`
+                    ? ` ${plan.fixedPrice}`
                     : isMetered
-                    ? `₹ ${plan.basePrice}`
+                    ? ` ${plan.basePrice}`
                     : isHybrid
-                    ? `₹ ${plan.fixedPrice} + ₹ ${plan.basePrice}`
-                    : "—";
+                    ? `${plan.basePrice}`
+                    : "—"
+                  ;
 
-                  const creditsDisplay = isMetered || isHybrid
-                    ? plan.creditsIncluded ?? "—"
-                    : "—";
+                  const creditsDisplay = isMetered || isHybrid ? plan.creditsIncluded ?? "—" : "—";
 
                   return (
                     <tr key={plan.id} className="border-b hover:bg-gray-50">
@@ -779,21 +827,34 @@ export default function Pricing() {
 
                   {/* Hybrid plan */}
                   {currentPlan.planType === "hybrid" && (
-                    <div className="grid grid-cols-2 gap-5 mt-5">
+                    <div className="grid gap-5 mt-5">
                       {/* Fixed */}
                       <div className="space-y-5 border-r pr-5">
-                        <h3 className="text-lg font-semibold text-blue-600">Fixed Plan Details</h3>
                         <div>
                           <label className="text-sm font-medium text-gray-700">
-                            Fixed Price
+                            Base Price
                             <span className="ml-1 text-xs text-blue-600 font-normal">
                               (required)
                             </span>
                           </label>
                           <input
                             className="w-full border px-3 py-2 rounded mt-1"
-                            value={String(currentPlan.fixedPrice ?? "")}
-                            onChange={(e) => updateCurrent({ fixedPrice: e.target.value })}
+                            value={String(currentPlan.basePrice ?? "")}
+                            onChange={(e) => updateCurrent({ basePrice: e.target.value })}
+                            inputMode="numeric"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">
+                            Price Per Credit
+                            <span className="ml-1 text-xs text-blue-600 font-normal">
+                              (required)
+                            </span>
+                          </label>
+                          <input
+                            className="w-full border px-3 py-2 rounded mt-1"
+                            value={String(currentPlan.pricePerCredit ?? "")}
+                            onChange={(e) => updateCurrent({ pricePerCredit: e.target.value })}
                             inputMode="numeric"
                           />
                         </div>
@@ -819,7 +880,7 @@ export default function Pricing() {
                             <h3 className="font-semibold">All Products</h3>
                             <button
                               onClick={() => {
-                                setProductType("included");
+                                setProductType("hybrid");
                                 setCreateProductModal(true);
                               }}
                               className="text-sm px-3 py-1 bg-blue-600 text-white rounded"
@@ -829,12 +890,12 @@ export default function Pricing() {
                           </div>
       
                           <div className="space-y-3 mb-4">
-                            {availableIncludedProducts.map(prod => (
+                            {availableHybridProducts.map((prod: any) => (
                               <div
                                 key={prod.id}
                                 className="flex justify-between p-3 bg-gray-100 rounded cursor-pointer hover:bg-gray-200"
                                 onClick={() => {
-                                  attachProductToPlan(prod, "included");
+                                  attachProductToPlan(prod, "hybrid");
                                 }}
                               >
                                 <span className="font-medium">{prod.name}</span>
@@ -845,25 +906,23 @@ export default function Pricing() {
                             ))}
                           </div>
       
-                          {currentPlan.includedProducts?.length === 0 ? (
-                            <p className="text-sm text-gray-500">No  included products yet.</p>
-                          ): (
+                          {currentPlan.hybridProducts?.length > 0 ? (
                             <div className="space-y-3 mt-5">
-                              <h3 className="font-semibold">Included Products</h3>
+                              <h3 className="font-semibold">Hybrid Products</h3>
                               <div className="space-y-3">
-                                {currentPlan?.includedProducts?.map((mu, idx) => (
+                                {currentPlan?.hybridProducts?.map((hp, idx) => (
                                   <div
-                                  key={mu.productId + "-" + idx}
+                                  key={hp.productId + "-" + idx}
                                   className="flex items-center justify-between gap-4 bg-gray-50 border rounded-lg p-3"
                                 >
-                                  <div key={mu.productId + "-" + idx} className="flex flex-col gap-2 p-3 rounded-lg bg-gray-50 w-full">
+                                  <div key={hp.productId + "-" + idx} className="flex flex-col gap-2 p-3 rounded-lg bg-gray-50 w-full">
                                     <div className="flex items-center justify-between">
-                                      <p className="text-sm font-medium text-gray-900">{mu.product?.name}</p>
+                                      <p className="text-sm font-medium text-gray-900">{hp.product?.name}</p>
                                       <button
                                         onClick={() =>
                                           setCurrentPlan(prev => ({
                                             ...prev!,
-                                            includedProducts: prev!.includedProducts.filter((_, i) => i !== idx)
+                                            hybridProducts: prev!.hybridProducts.filter((_, i) => i !== idx)
                                           }))
                                         }
                                         className="text-xs font-semibold text-red-600 bg-red-50 px-3 py-1.5 rounded-md 
@@ -873,6 +932,119 @@ export default function Pricing() {
                                         Remove
                                       </button>
                                     </div>
+                                    <div className="flex flex-col w-full gap-3 py-2">
+                                      {/* Usage selection */}
+                                      <div className="flex gap-6">
+                                        {/* Unlimited */}
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                          <input
+                                            type="radio"
+                                            name={`usage-${hp.productId ?? idx}`}
+                                            checked={hp.unlimitedUsage === true}
+                                            onChange={() => {
+                                              setCurrentPlan(prev => ({
+                                                ...prev!,
+                                                hybridProducts: prev!.hybridProducts.map((item, i) =>
+                                                  i === idx
+                                                    ? {
+                                                        ...item,
+                                                        unlimitedUsage: true,
+                                                        numberOfUnits: 0,
+                                                        creditsPerUnit: 0,
+                                                      }
+                                                    : item
+                                                ),
+                                              }));
+                                            }}
+                                            className="cursor-pointer"
+                                          />
+                                          <span className="text-sm font-medium text-gray-700">Unlimited usage</span>
+                                        </label>
+
+                                        {/* Limited */}
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                          <input
+                                            type="radio"
+                                            name={`usage-${hp.productId ?? idx}`}
+                                            checked={hp.unlimitedUsage === false}
+                                            onChange={() => {
+                                              setCurrentPlan(prev => ({
+                                                ...prev!,
+                                                hybridProducts: prev!.hybridProducts.map((item, i) =>
+                                                  i === idx
+                                                    ? {
+                                                        ...item,
+                                                        unlimitedUsage: false,
+                                                        numberOfUnits: item.numberOfUnits ?? 0,
+                                                        creditsPerUnit: item.creditsPerUnit ?? 0,
+                                                      }
+                                                    : item
+                                                ),
+                                              }));
+                                            }}
+                                            className="cursor-pointer"
+                                          />
+                                          <span className="text-sm font-medium text-gray-700">Limited usage</span>
+                                        </label>
+                                      </div>
+
+                                      {/* Extra fields when Limited is selected */}
+                                      {hp.unlimitedUsage === false && (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1 w-full">
+                                          <div className="flex flex-col gap-1">
+                                            <label className="text-xs font-medium text-gray-700">
+                                              No. of units
+                                            </label>
+                                            <input
+                                              type="number"
+                                              min={0}
+                                              className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                                              value={String(hp.numberOfUnits) ?? ""}
+                                              onChange={e => {
+                                                const value = e.target.value;
+                                                setCurrentPlan(prev => ({
+                                                  ...prev!,
+                                                  hybridProducts: prev!.hybridProducts.map((item, i) =>
+                                                    i === idx
+                                                      ? {
+                                                          ...item,
+                                                          numberOfUnits: value === "" ? 0 : Number(value),
+                                                        }
+                                                      : item
+                                                  ),
+                                                }));
+                                              }}
+                                            />
+                                          </div>
+
+                                          <div className="flex flex-col gap-1">
+                                            <label className="text-xs font-medium text-gray-700">
+                                              Credits per unit
+                                            </label>
+                                            <input
+                                              type="number"
+                                              min={0}
+                                              className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                                              value={String(hp.creditsPerUnit) ?? ""}
+                                              onChange={e => {
+                                                const value = e.target.value;
+                                                setCurrentPlan(prev => ({
+                                                  ...prev!,
+                                                  hybridProducts: prev!.hybridProducts.map((item, i) =>
+                                                    i === idx
+                                                      ? {
+                                                          ...item,
+                                                          creditsPerUnit: value === "" ? 0 : Number(value),
+                                                        }
+                                                      : item
+                                                  ),
+                                                }));
+                                              }}
+                                            />
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
                                     <div className="flex flex-col gap-1">
                                       <label className="text-xs font-medium text-gray-600">
                                         Number of Licenses
@@ -881,12 +1053,12 @@ export default function Pricing() {
                                       <input
                                         className="border border-gray-300 px-3 py-2 rounded text-sm
                                                   focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-                                        value={mu.product?.license || ""}
+                                        value={hp.product?.license || ""}
                                         onChange={(e) => {
                                           const updatedLicense = e.target.value;
                                           setCurrentPlan(prev => ({
                                             ...prev!,
-                                            includedProducts: prev!.includedProducts.map((item, i) =>
+                                            hybridProducts: prev!.hybridProducts.map((item, i) =>
                                               i === idx
                                                 ? {
                                                     ...item,
@@ -906,172 +1078,11 @@ export default function Pricing() {
                                 ))}
                               </div>
                             </div>
-                          )}
-      
-                        </div>
-                      </div>
-                      {/* Metered */}
-                      <div className="space-y-5">
-                        <h3 className="text-lg font-semibold text-blue-600">Metered Plan Details</h3>
-                        <div className="grid grid-cols-1 gap-4">
-                          <div>
-                            <label className="text-sm font-medium text-gray-700">
-                              Base Price
-                              <span className="ml-1 text-xs text-blue-600 font-normal">
-                                (required)
-                              </span>
-                            </label>
-                            <input
-                              className="w-full border px-3 py-2 rounded mt-1"
-                              value={String(currentPlan.basePrice ?? "")}
-                              onChange={(e) => updateCurrent({ basePrice: e.target.value })}
-                              inputMode="numeric"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium text-gray-700">
-                              Credits Included
-                              <span className="ml-1 text-xs text-blue-600 font-normal">
-                                (required)
-                              </span>
-                            </label>
-                            <input
-                              className="w-full border px-3 py-2 rounded mt-1"
-                              value={String(currentPlan.creditsIncluded ?? "")}
-                              onChange={(e) => updateCurrent({ creditsIncluded: e.target.value })}
-                              inputMode="numeric"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold"></label>
-                          <label className="text-sm font-medium text-gray-700">
-                            Validity (in months)
-                            <span className="ml-1 text-xs text-blue-600 font-normal">
-                              (required)
-                            </span>
-                          </label>
-                          <input
-                            type="number"
-                            className="w-full border px-3 py-2 rounded mt-1"
-                            value={String(currentPlan.validity)}
-                            onChange={(e) =>
-                              updateCurrent({ validity: Number(e.target.value) })
-                            }
-                          />
-                        </div>
-                        <div className="bg-white p-6 rounded shadow mb-4">
-                          <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-semibold">All Products</h3>
-                            <button
-                              onClick={() => {
-                                setProductType("metered");
-                                setCreateProductModal(true);
-                              }}
-                              className="text-sm px-3 py-1 bg-blue-600 text-white rounded"
-                            >
-                              + Add Product
-                            </button>
-                          </div>
-
-                          <div className="space-y-3 mb-4">
-                            {availableMeteredProducts.map(prod => (
-                              <div
-                                key={prod.id}
-                                className="flex justify-between p-3 bg-gray-100 rounded cursor-pointer hover:bg-gray-200"
-                                onClick={() => {
-                                  attachProductToPlan(prod, "metered");
-                                }}
-                              >
-                                <span className="font-medium">{prod.name}</span>
-                                <button className="px-2 py-1 bg-blue-600 text-white rounded text-xs">
-                                  Add
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-
-                          {currentPlan.meteredProducts.length === 0 ? (
-                            <p className="text-sm text-gray-500">No metered products yet.</p>
                           ): (
-                            <div className="space-y-3">
-                              <h3 className="font-semibold pt-1">Metered Products</h3>
-                              {currentPlan?.meteredProducts?.map((mu, idx) => (
-                                <div key={mu.productId + "-" + idx} className="flex items-center gap-4">
-                                  <div key={mu.productId + "-" + idx} className="flex flex-col gap-2 p-3 rounded-lg bg-gray-50 w-full">
-                                    <div className="flex items-center justify-between">
-                                      <p className="text-sm font-medium text-gray-900">{mu.product?.name}</p>
-                                      <button
-                                        onClick={() =>
-                                          setCurrentPlan(prev => ({
-                                            ...prev!,
-                                            meteredProducts: prev!.meteredProducts.filter((_, i) => i !== idx)
-                                          }))
-                                        }
-                                        className="text-xs font-semibold text-red-600 bg-red-50 px-3 py-1.5 rounded-md border border-red-200 hover:bg-red-100 hover:text-red-700 transition cursor-pointer"
-                                      >
-                                        Remove
-                                      </button>
-                                    </div>
-                                    <div className="flex flex-col gap-2">
-                                      <div className="flex flex-col gap-1">
-                                        <label className="text-xs font-medium text-gray-600">
-                                          Credits
-                                          <span className="text-gray-400 ml-1">(required)</span>
-                                        </label>
-                                        <input
-                                          className="border border-gray-300 px-3 py-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-                                          value={String(mu.credits) || ""}
-                                          onChange={(e) => {
-                                            const updatedCredits = e.target.value;
-                                            setCurrentPlan(prev => ({
-                                              ...prev!,
-                                              meteredProducts: prev!.meteredProducts.map((item, i) =>
-                                                i === idx
-                                                  ? {
-                                                      ...item,
-                                                      credits: updatedCredits,
-                                                    }
-                                                  : item
-                                              ),
-                                            }));
-                                          }}
-                                        />
-                                      </div>
-                                      {/* <div className="flex flex-col gap-1">
-                                        <label className="text-xs font-medium text-gray-600">
-                                          Number of Licenses
-                                          <span className="text-gray-400 ml-1">(optional)</span>
-                                        </label>
-                                        <input
-                                          className="border border-gray-300 px-3 py-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-                                          value={String(mu.product?.license) || ""}
-                                          onChange={(e) => {
-                                            const updatedLicense = e.target.value;
-                                            setCurrentPlan(prev => ({
-                                              ...prev!,
-                                              meteredProducts: prev!.meteredProducts.map((item, i) =>
-                                                i === idx
-                                                  ? {
-                                                      ...item,
-                                                      product: {
-                                                        ...item.product,
-                                                        license: updatedLicense,
-                                                      },
-                                                    }
-                                                  : item
-                                              ),
-                                            }));
-                                          }}
-                                        />
-                                      </div> */}
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
+                            <p className="text-sm text-gray-500">No hybrid products yet.</p>
                           )}
 
+      
                         </div>
                       </div>
                     </div>
