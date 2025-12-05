@@ -86,6 +86,7 @@ interface RestaurantBrand {
   business: {
     name: string;
     address: string;
+    GSTIN: string;
   };
 }
 
@@ -145,7 +146,7 @@ export default function ProformaInvoice() {
 
   const createdDate = new Date(pricingPlan.createdAt);
   const endDate = new Date(createdDate);
-  endDate.setMonth(endDate.getMonth() + pricingPlan.validity);
+  endDate.setMonth(endDate.getMonth() + (pricingPlan.validity - 1));
 
   const formatDate = (date: Date) =>
     date.toLocaleDateString("en-GB", {
@@ -154,6 +155,7 @@ export default function ProformaInvoice() {
     });
 
   const subscriptionPeriod = `${formatDate(createdDate)} — ${formatDate(endDate)}`;
+  console.log({ subscriptionPeriod });
 
   const subTotalAmount = Math.ceil(invoice.subTotalAmount);
   const totalAmount = Math.ceil(invoice.totalAmount);
@@ -205,6 +207,7 @@ export default function ProformaInvoice() {
         <p className="font-semibold">To,</p>
         <p>{restaurant.brand.business.name}</p>
         <p>{restaurant.brand.business.address}</p>
+        <p>{restaurant.brand.business.GSTIN}</p>
       </div>
 
       {/* Table */}

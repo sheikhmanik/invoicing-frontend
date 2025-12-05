@@ -83,6 +83,7 @@ export default function Customers() {
   const [allPlans, setAllPlans] = useState<PricingPlan[]>([]);
   const [planEditingModal, setPlanEditingModal] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState<null | Record<any, any>>(null);
+  const [selectedPricingPlanId, setSelectedPricingPlanId] = useState<number | null>(null);
   const [currentPlan, setCurrentPlan] = useState<PricingPlan>();
   const [confirmAssigned, setConfirmAssigned] = useState(false);
   const [confirmAssignModal, setConfirmAssignModal] = useState(false);
@@ -135,21 +136,23 @@ export default function Customers() {
     if (pricingPlanId) {
       const planRes = await axios.get(`${API}/restaurant/plan-map/${restaurantId}/${pricingPlanId}`);
       const fullPlan = planRes.data;
+      console.log(fullPlan);
       const { addLut, cgst, igst, sgst } = fullPlan;
       setTaxSettings({ LUT: addLut, CGST: cgst, IGST: igst, SGST: sgst });
       if (fullPlan) setCurrentPlan(fullPlan.pricingPlan);
     }
   }
 
-  async function handleAssignPlan(restaurantId: number, pricingPlanId: number) {
+  async function handleAssignPlan(restaurantId: number, pricingPlanId: number, confirm: boolean) {
     if (!startDate) return alert("Please include start date.");
     if (!planMode) return alert("Please include plan mode.");
     if (planMode === "trial" && !trialDays) return alert("Please include trial days.");
-    if (!confirmAssigned) {
+    setSelectedPricingPlanId(pricingPlanId);
+    setAssigningPlanId(pricingPlanId);
+    if (!confirm) {
       setConfirmAssignModal(true);
       return;
     }
-    setAssigningPlanId(pricingPlanId);
     setAssigningPlan(true);
     const payload = {
       restaurantId,
@@ -1214,9 +1217,7 @@ export default function Customers() {
                     <div>
                       <h3 className="text-sm font-semibold text-gray-800 mt-2">Included Products</h3>
 
-                      {currentPlan.includedProducts?.length === 0 || !currentPlan.includedProducts ? (
-                        <p className="text-gray-500 text-sm">No included products found.</p>
-                      ) : (
+                      {currentPlan.includedProducts?.length > 0 ? (
                         <div className="space-y-3 mt-2">
                           {currentPlan.includedProducts?.map((prod, idx) => (
                             <div
@@ -1229,6 +1230,8 @@ export default function Customers() {
                             </div>
                           ))}
                         </div>
+                      ) : (
+                        <p className="text-gray-500 text-sm">No included products found.</p>
                       )}
                     </div>
                   )}
@@ -1238,8 +1241,6 @@ export default function Customers() {
                       <h3 className="text-sm font-semibold text-gray-800 mt-2">Metered Products</h3>
 
                       {(currentPlan.meteredProducts?.length === 0 || !currentPlan.meteredProducts) ? (
-                        <p className="text-gray-500 text-sm">No metered products found.</p>
-                      ) : (
                         <div className="space-y-3 mt-2">
                           {currentPlan.meteredProducts?.map((prod, idx) => (
                             <div
@@ -1256,6 +1257,8 @@ export default function Customers() {
                             </div>
                           ))}
                         </div>
+                      ) : (
+                        <p className="text-gray-500 text-sm">No metered products found.</p>
                       )}
                     </div>
                   )}
@@ -1264,25 +1267,76 @@ export default function Customers() {
                     <div>
                       <h3 className="text-sm font-semibold text-gray-800 mt-2">Hybrid Products</h3>
 
-                      {currentPlan.hybridProducts?.length === 0 || !currentPlan.hybridProducts ? (
-                        <p className="text-gray-500 text-sm">No Hybrid products found.</p>
-                      ) : (
+                      {currentPlan.hybridProducts?.length > 0 ? (
                         <div className="space-y-3 mt-2">
                           {currentPlan.hybridProducts?.map((prod, idx) => (
                             <div
-                              key={prod.productId + "-included-" + idx}
-                              className="p-3 bg-white border rounded-lg shadow-sm flex justify-between"
-                            >
-                              <div className="text-sm font-medium text-gray-800">
+                            key={prod.productId + "-hybrid-" + idx}
+                            className="p-4 bg-linear-to-br from-white to-gray-50 border border-gray-200 
+                                       rounded-2xl shadow-sm hover:shadow-md transition-all duration-200"
+                          >
+                          
+                            {/* Header */}
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-sm font-semibold text-gray-900">
                                 {prod.product?.name}
-                              </div>
+                              </h4>
+                          
+                              <span
+                                className={`px-3 py-1 text-xs rounded-full font-medium ${
+                                  prod.unlimitedUsage
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-blue-100 text-blue-700"
+                                }`}
+                              >
+                                {prod.unlimitedUsage ? "Unlimited" : "Limited"}
+                              </span>
                             </div>
+                          
+                            {/* Divider */}
+                            <div className="mt-3 border-b border-gray-200"></div>
+
+                            <div className="grid grid-cols-3 gap-2 mt-3 text-[11px]">
+                              {/* Units */}
+                              <div className="bg-gray-50 p-2 border rounded-md flex items-center justify-between">
+                                <p className="text-gray-500 leading-none flex items-center gap-1">
+                                  🔢 Units
+                                </p>
+                                <p className="text-gray-900 font-semibold mt-1 text-xs text-right">
+                                  {prod.numberOfUnits ?? "0"}
+                                </p>
+                              </div>
+
+                              {/* Credits Per Unit */}
+                              <div className="bg-gray-50 p-2 border rounded-md flex items-center justify-between">
+                                <p className="text-gray-500 leading-none flex items-center gap-1">
+                                  💳 Cr/Unit
+                                </p>
+                                <p className="text-gray-900 font-semibold mt-1 text-xs text-right">
+                                  {prod.creditsPerUnit ?? "0"}
+                                </p>
+                              </div>
+
+                              {/* License */}
+                              <div className="bg-indigo-50 p-2 border border-indigo-200 rounded-md flex items-center justify-between">
+                                <p className="text-indigo-600 leading-none flex items-center gap-1">
+                                  🔐 License
+                                </p>
+                                <p className="text-indigo-900 font-semibold text-xs text-right">
+                                  {prod.product.license}
+                                </p>
+                              </div>
+
+                            </div>
+                          
+                          </div>
                           ))}
                         </div>
+                      ) : (
+                        <p className="text-gray-500 text-sm">No Hybrid products found.</p>
                       )}
                     </div>
                   )}
-
 
                 </div>
               )}
@@ -1613,10 +1667,22 @@ export default function Customers() {
                 <input
                   type="date"
                   value={paymentDate}
-                  onChange={(e) => setPaymentDate(e.target.value)}
-                  onClick={e => (e.target as HTMLInputElement).showPicker()}
-                  className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50 focus:bg-white
-                  focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
+                  max={new Date().toISOString().split("T")[0]} // ⛔ prevents future calendar selection
+                  onChange={(e) => {
+                    const selectedDate = e.target.value;
+                    const today = new Date().toISOString().split("T")[0];
+
+                    if (selectedDate > today) {
+                      alert("You cannot select a future date");
+                      return; // keep old value
+                    }
+
+                    setPaymentDate(selectedDate);
+                  }}
+                  onClick={(e) => (e.target as HTMLInputElement).showPicker()}
+                  className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50
+                            focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500
+                            outline-none transition-all"
                 />
               </div>
 
@@ -1674,12 +1740,16 @@ export default function Customers() {
                     <label className="text-sm font-medium text-gray-700">Partial Payment Amount</label>
                     <input
                       type="number"
-                      min={1}
-                      className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50 focus:bg-white
-                      focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
+                      min={0}
+                      step="0.01" // if you want decimal payments
                       value={partialAmount ?? ""}
-                      onChange={(e) => setPartialAmount(Number(e.target.value))}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setPartialAmount(!isNaN(val) && val >= 0 ? val : 0);
+                      }}
                       placeholder="Enter partial payment amount"
+                      className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50 focus:bg-white
+                                focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
                       required
                     />
                   </div>
@@ -1747,7 +1817,6 @@ export default function Customers() {
       {confirmAssignModal && (
         <div
           onClick={() => {
-            setConfirmAssigned(false);
             setConfirmAssignModal(false);
           }}
           className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn"
@@ -1761,7 +1830,7 @@ export default function Customers() {
 
             {/* Text */}
             <h2 className="text-lg font-bold text-gray-900">
-              Are you sure you want to proceed?
+              Do you want apply this pricing plan?
             </h2>
             <p className="text-sm text-gray-600 leading-5">
               This action is irreversible. If needed, please cancel and review before confirming.
@@ -1772,7 +1841,6 @@ export default function Customers() {
               <button
                 className="px-5 py-2.5 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100 transition-all"
                 onClick={() => {
-                  setConfirmAssigned(false);
                   setConfirmAssignModal(false);
                 }}
               >
@@ -1782,8 +1850,10 @@ export default function Customers() {
               <button
                 className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-red-600 text-white shadow hover:bg-red-700 focus:ring-2 focus:ring-red-400 transition-all"
                 onClick={() => {
-                  setConfirmAssigned(true);
-                  setConfirmAssignModal(false);
+                  setConfirmAssignModal(false)
+                  if (selectedRestaurant?.id && selectedPricingPlanId) {
+                    handleAssignPlan(selectedRestaurant.id, selectedPricingPlanId, true);
+                  }
                 }}
               >
                 Yes, Confirm

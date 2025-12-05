@@ -221,7 +221,7 @@ export default function Pricing() {
       fixedPrice: currentPlan.planType !== "metered" ? Number(currentPlan.fixedPrice) : null,
       basePrice: currentPlan.planType !== "fixed" ? Number(currentPlan.basePrice) : null,
       creditsIncluded: Number(currentPlan.creditsIncluded),
-      billingCycle: currentPlan.planType !== "metered" ? currentPlan.billingCycle : null,
+      billingCycle: currentPlan.planType === "fixed" ? currentPlan.billingCycle : null,
       validity: currentPlan.planType !== "fixed" ? currentPlan.validity : null,
       pricePerCredit:
         currentPlan.planType === "hybrid"
@@ -861,7 +861,7 @@ export default function Pricing() {
                         <div>
                           <label className="block text-sm font-semibold"></label>
                           <label className="text-sm font-medium text-gray-700">
-                            Billing Cycle (in months)
+                            Validity (in months)
                             <span className="ml-1 text-xs text-blue-600 font-normal">
                               (required)
                             </span>
@@ -869,9 +869,9 @@ export default function Pricing() {
                           <input
                             type="number"
                             className="w-full border px-3 py-2 rounded mt-1"
-                            value={String(currentPlan.billingCycle)}
+                            value={String(currentPlan.validity ?? "")}
                             onChange={(e) =>
-                              updateCurrent({ billingCycle: Number(e.target.value) })
+                              updateCurrent({ validity: Number(e.target.value) })
                             }
                           />
                         </div>

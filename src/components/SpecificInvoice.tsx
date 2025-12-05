@@ -87,6 +87,7 @@ interface RestaurantBrand {
   business: {
     name: string;
     address: string;
+    GSTIN: string;
   };
 }
 
@@ -147,7 +148,7 @@ export default function SpecificInvoice() {
 
   const createdDate = new Date(pricingPlan.createdAt);
   const endDate = new Date(createdDate);
-  endDate.setMonth(endDate.getMonth() + pricingPlan.validity);
+  endDate.setMonth(endDate.getMonth() + pricingPlan.validity - 1);
 
   const formatDate = (date: Date) =>
     date.toLocaleDateString("en-GB", {
@@ -207,6 +208,7 @@ export default function SpecificInvoice() {
         <p className="font-semibold">To,</p>
         <p>{restaurant.brand.business.name}</p>
         <p>{restaurant.brand.business.address}</p>
+        <p>{restaurant.brand.business.GSTIN}</p>
       </div>
 
       {/* Table */}
