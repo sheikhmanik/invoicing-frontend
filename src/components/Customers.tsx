@@ -753,10 +753,6 @@ export default function Customers() {
 
                             {r.invoices
                               ?.filter((inv: any) => inv.partialAmount > 0 || inv.paymentFileUrl || inv.paymentNotes) // 👈 show any payment record
-                              ?.sort(
-                                (a: any, b: any) =>
-                                  new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()
-                              )
                               ?.map((inv: any, i: number) => (
                                 <div
                                   key={inv.id || i}

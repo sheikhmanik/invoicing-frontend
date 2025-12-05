@@ -77,10 +77,12 @@ interface RestaurantInvoice {
   invoiceNumber: string;
   subTotalAmount: number;
   totalAmount: number;
-  partialAmount: number;
-  remainingAmount: number;
-  status: "pending" | "paid";
-  paymentDate: string;
+  partialAmount: number | null;
+  remainingAmount: number | null;
+  status: "pending" | "paid" | "partially paid";
+  paymentDate: string | null;
+  createdAt: string;
+  pricingPlanId: number;
 }
 
 interface RestaurantBrand {
@@ -139,12 +141,21 @@ export default function SpecificInvoice() {
     return <div className="text-center text-red-600 mt-10">Invoice data not found</div>
   ;
 
-  const invoice = restaurant.invoices.at(-1) || null;
   const pricingPlan = restaurant.restaurantPricingPlans[0]?.pricingPlan || null;
 
-  if (!invoice || !pricingPlan || !restaurant)
-    return <div className="text-center text-red-600 mt-10">Invoice data not found</div>
-  ;
+  const specificInv = restaurant.invoices.find(
+    (inv) => inv.id === specificInvId
+  ) || restaurant.invoices.at(-1) || null;
+
+  if (!specificInv || !pricingPlan || !restaurant) {
+    return (
+      <div className="text-center text-red-600 mt-10">
+        Invoice data not found
+      </div>
+    );
+  }
+
+  const invoice = specificInv;
 
   const createdDate = new Date(pricingPlan.createdAt);
   const endDate = new Date(createdDate);
@@ -158,8 +169,8 @@ export default function SpecificInvoice() {
 
   const subscriptionPeriod = `${formatDate(createdDate)} — ${formatDate(endDate)}`;
 
-  const subTotalAmount = Math.ceil(invoice.subTotalAmount);
-  const totalAmount = Math.ceil(invoice.totalAmount);
+  const subTotalAmount = Math.ceil(invoice.subTotalAmount ?? 0);
+  const totalAmount = Math.ceil(invoice.totalAmount ?? 0);
   const amountInWords = `${numberToWords(totalAmount)} only`;
 
   function groupInvoicesIntoCycles(invoices: any[]) {
@@ -176,26 +187,21 @@ export default function SpecificInvoice() {
       const invoice = sorted[i];
   
       if (i === 0) {
-        // first invoice always starts a new cycle
         currentCycle.push(invoice);
         continue;
       }
   
       const prev = sorted[i - 1];
-  
       const planChanged = invoice.pricingPlanId !== prev.pricingPlanId;
   
-      // If plan changed → new billing cycle
       if (planChanged) {
         cycles.push(currentCycle);
         currentCycle = [invoice];
       } else {
-        // Same plan → continue same cycle
         currentCycle.push(invoice);
       }
     }
   
-    // push last cycle
     if (currentCycle.length > 0) cycles.push(currentCycle);
   
     return cycles;
@@ -231,7 +237,15 @@ export default function SpecificInvoice() {
 
       {/* Title + Date */}
       <div className="flex justify-between mb-4 mt-10">
-        <h3 className="text-xl font-bold">{invoice.status === "pending" ? "Proforma Invoice" : invoice.status === "paid" ? "Tax Invoice" : invoice.status === "partially paid" ? "Proforma Invoice (partially paid)" : ""}</h3>
+        <h3 className="text-xl font-bold">
+          {invoice.status === "pending"
+            ? "Proforma Invoice"
+            : invoice.status === "paid"
+            ? "Tax Invoice"
+            : invoice.status === "partially paid"
+            ? "Proforma Invoice (partially paid)"
+            : ""}
+        </h3>
         <p>Date: {new Date().toLocaleDateString("en-GB")}</p>
       </div>
 
@@ -312,17 +326,34 @@ export default function SpecificInvoice() {
           {/* PAYMENT HISTORY UP TO THIS INVOICE */}
           {(() => {
             const cycles = groupInvoicesIntoCycles(restaurant.invoices || []);
-            const invoices = cycles.length > 0 ? cycles[cycles.length - 1] : [];
-            const sorted = [...invoices].sort((a, b) => a.id - b.id); // oldest → latest
-            const indexOfCurrent = sorted.findIndex((inv) => inv.id === specificInvId);
 
+            // 1️⃣ Find the cycle that contains the specific invoice
+            let invoices: any[] = [];
+            for (const cycle of cycles) {
+              if (cycle.some((inv: any) => inv.id === specificInvId)) {
+                invoices = cycle;
+                break;
+              }
+            }
+
+            if (!invoices.length) return null;
+
+            // 2️⃣ Sort that cycle's invoices oldest → latest
+            const sorted = [...invoices].sort(
+              (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+            );
+
+            // 3️⃣ Find index of the specific invoice within that cycle
+            const indexOfCurrent = sorted.findIndex((inv) => inv.id === specificInvId);
             if (indexOfCurrent === -1) return null;
 
-            // include only invoices up to the selected one
+            // 4️⃣ Only show invoices up to and including the selected one
             const displayInvoices = sorted.slice(0, indexOfCurrent + 1);
 
-            // filter only invoices which have payments
-            const paymentHistory = displayInvoices.filter(inv => inv.partialAmount > 0);
+            // 5️⃣ Filter only invoices which have payments
+            const paymentHistory = displayInvoices.filter(
+              (inv) => (inv.partialAmount ?? 0) > 0
+            );
 
             if (paymentHistory.length === 0) {
               return (
@@ -337,9 +368,9 @@ export default function SpecificInvoice() {
             return paymentHistory.map((inv, i) => (
               <tr key={i} className="bg-green-50 font-medium">
                 <td colSpan={3} className="border p-2 text-right text-green-700">
-                  {inv.status === "paid" ? "Fully Paid" : "Partially Paid"} — {inv.paymentDate?.split("T")[0] || "—"}
+                  {inv.status === "paid" ? "Fully Paid" : "Partially Paid"} —{" "}
+                  {inv.paymentDate?.split("T")[0] || "—"}
                 </td>
-
                 <td className="border p-2 text-center text-green-700">
                   {inv.partialAmount}.00/-
                 </td>
@@ -347,10 +378,9 @@ export default function SpecificInvoice() {
             ));
           })()}
 
-          {/* REMAINING DUE — ONLY FOR CURRENT INVOICE */}
+          {/* REMAINING DUE — ONLY FOR SPECIFIC INVOICE */}
           {(() => {
-            const specificInv = restaurant.invoices.find(inv => inv.id === specificInvId);
-            if (!specificInv) return null;
+            const remaining = invoice.remainingAmount ?? 0;
 
             return (
               <tr className="bg-red-50 font-semibold">
@@ -358,7 +388,7 @@ export default function SpecificInvoice() {
                   Remaining Amount Due
                 </td>
                 <td className="border p-2 text-center text-red-700">
-                  {Math.max(specificInv.remainingAmount, 0)}.00/-
+                  {Math.max(remaining, 0)}.00/-
                 </td>
               </tr>
             );
