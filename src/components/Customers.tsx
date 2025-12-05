@@ -136,7 +136,6 @@ export default function Customers() {
     if (pricingPlanId) {
       const planRes = await axios.get(`${API}/restaurant/plan-map/${restaurantId}/${pricingPlanId}`);
       const fullPlan = planRes.data;
-      console.log(fullPlan);
       const { addLut, cgst, igst, sgst } = fullPlan;
       setTaxSettings({ LUT: addLut, CGST: cgst, IGST: igst, SGST: sgst });
       if (fullPlan) setCurrentPlan(fullPlan.pricingPlan);
@@ -167,8 +166,10 @@ export default function Customers() {
       alert("Plan assigned successfully!");
       setPlanEditingModal(false);
       window.location.reload();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      // console.error(err);
+      const backendMsg = err?.response?.data?.message || err?.message || "Something went wrong!";
+      alert(backendMsg);
     } finally {
       setConfirmAssigned(false);
       setAssigningPlan(false);
@@ -316,6 +317,45 @@ export default function Customers() {
         </tbody>
       </table>
     );
+  }
+
+  function groupInvoicesIntoCycles(invoices: any[]) {
+    if (!invoices || invoices.length === 0) return [];
+  
+    const sorted = [...invoices].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+  
+    const cycles = [];
+    let currentCycle = [];
+  
+    for (let i = 0; i < sorted.length; i++) {
+      const invoice = sorted[i];
+  
+      if (i === 0) {
+        // first invoice always starts a new cycle
+        currentCycle.push(invoice);
+        continue;
+      }
+  
+      const prev = sorted[i - 1];
+  
+      const planChanged = invoice.pricingPlanId !== prev.pricingPlanId;
+  
+      // If plan changed → new billing cycle
+      if (planChanged) {
+        cycles.push(currentCycle);
+        currentCycle = [invoice];
+      } else {
+        // Same plan → continue same cycle
+        currentCycle.push(invoice);
+      }
+    }
+  
+    // push last cycle
+    if (currentCycle.length > 0) cycles.push(currentCycle);
+  
+    return cycles;
   }
 
   return (
@@ -467,7 +507,7 @@ export default function Customers() {
                           <div className="text-red-600 font-semibold">
                             {r.invoices?.[r.invoices.length - 1]?.status === "pending"
                             || r.invoices?.[r.invoices.length - 1]?.status === "partially paid" ? (
-                              <p>${r.invoices?.[r.invoices.length - 1]?.remainingAmount}</p>
+                              <p>{r.invoices?.[r.invoices.length - 1]?.remainingAmount}</p>
                             ) : "-"}
                           </div>
                         </td>
@@ -475,7 +515,9 @@ export default function Customers() {
                         {/* PAID */}
                         <td className="p-4 border-r text-center leading-5">
                           {(() => {
-                            const invoices = r.invoices || [];
+
+                            const cycles = groupInvoicesIntoCycles(r.invoices || []);
+                            const invoices = cycles.length > 0 ? cycles[cycles.length - 1] : [];
                             if (invoices.length === 0) {
                               return <span className="text-gray-400">—</span>;
                             }
@@ -485,8 +527,6 @@ export default function Customers() {
                             const partials = invoices.filter((inv: any) =>
                               inv.status?.toLowerCase().trim() === "partially paid"
                             );
-
-                            console.log("STATUS:", status, "LATEST:", latest, "PARTIALS:", partials);
 
                             // ⭐ Fully Paid
                             if (status === "paid") {
@@ -964,10 +1004,10 @@ export default function Customers() {
                         <td className="p-4 border-r text-center leading-5">
                           <div className="text-red-600 font-semibold">
                             {r.invoices?.[r.invoices.length - 1]?.status === "pending" && (
-                              <p>${r.invoices?.[r.invoices.length - 1]?.totalAmount}</p>
+                              <p>{r.invoices?.[r.invoices.length - 1]?.totalAmount}</p>
                             )}
                             {r.invoices?.[r.invoices.length - 1]?.status === "partially paid" && (
-                              <p>${r.invoices?.[r.invoices.length - 1]?.remainingAmount}</p>
+                              <p>{r.invoices?.[r.invoices.length - 1]?.remainingAmount}</p>
                             )}
                           </div>
                         </td>
@@ -992,7 +1032,9 @@ export default function Customers() {
                         {/* PAID */}
                         <td className="p-4 border-r text-center leading-5">
                           {(() => {
-                            const invoices = r.invoices || [];
+
+                            const cycles = groupInvoicesIntoCycles(r.invoices || []);
+                            const invoices = cycles.length > 0 ? cycles[cycles.length - 1] : [];
                             if (invoices.length === 0) {
                               return <span className="text-gray-400">—</span>;
                             }
@@ -1002,8 +1044,6 @@ export default function Customers() {
                             const partials = invoices.filter((inv: any) =>
                               inv.status?.toLowerCase().trim() === "partially paid"
                             );
-
-                            console.log("STATUS:", status, "LATEST:", latest, "PARTIALS:", partials);
 
                             // ⭐ Fully Paid
                             if (status === "paid") {
@@ -1832,12 +1872,9 @@ export default function Customers() {
             <h2 className="text-lg font-bold text-gray-900">
               Do you want apply this pricing plan?
             </h2>
-            <p className="text-sm text-gray-600 leading-5">
-              This action is irreversible. If needed, please cancel and review before confirming.
-            </p>
 
             {/* Buttons */}
-            <div className="flex items-center justify-center gap-4 mt-2">
+            <div className="flex items-center justify-center gap-4">
               <button
                 className="px-5 py-2.5 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100 transition-all"
                 onClick={() => {

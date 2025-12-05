@@ -161,6 +161,45 @@ export default function ProformaInvoice() {
   const totalAmount = Math.ceil(invoice.totalAmount);
   const amountInWords = `${numberToWords(totalAmount)} only`;
 
+  function groupInvoicesIntoCycles(invoices: any[]) {
+    if (!invoices || invoices.length === 0) return [];
+  
+    const sorted = [...invoices].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+  
+    const cycles = [];
+    let currentCycle = [];
+  
+    for (let i = 0; i < sorted.length; i++) {
+      const invoice = sorted[i];
+  
+      if (i === 0) {
+        // first invoice always starts a new cycle
+        currentCycle.push(invoice);
+        continue;
+      }
+  
+      const prev = sorted[i - 1];
+  
+      const planChanged = invoice.pricingPlanId !== prev.pricingPlanId;
+  
+      // If plan changed → new billing cycle
+      if (planChanged) {
+        cycles.push(currentCycle);
+        currentCycle = [invoice];
+      } else {
+        // Same plan → continue same cycle
+        currentCycle.push(invoice);
+      }
+    }
+  
+    // push last cycle
+    if (currentCycle.length > 0) cycles.push(currentCycle);
+  
+    return cycles;
+  }
+
   return (
     <>
     <div
@@ -271,7 +310,11 @@ export default function ProformaInvoice() {
           
           {/* ALL PAYMENT RECORDS THAT REDUCE REMAINING AMOUNT */}
           {(() => {
-            const partials = restaurant.invoices
+
+            const cycles = groupInvoicesIntoCycles(restaurant.invoices || []);
+            const invoices = cycles.length > 0 ? cycles[cycles.length - 1] : [];
+
+            const partials = invoices
               ?.filter((inv: any) => inv.partialAmount > 0) // 👈 include FULL payment if partialAmount exists
               ?.sort(
                 (a: any, b: any) =>

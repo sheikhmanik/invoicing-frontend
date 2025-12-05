@@ -162,6 +162,45 @@ export default function SpecificInvoice() {
   const totalAmount = Math.ceil(invoice.totalAmount);
   const amountInWords = `${numberToWords(totalAmount)} only`;
 
+  function groupInvoicesIntoCycles(invoices: any[]) {
+    if (!invoices || invoices.length === 0) return [];
+  
+    const sorted = [...invoices].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+  
+    const cycles = [];
+    let currentCycle = [];
+  
+    for (let i = 0; i < sorted.length; i++) {
+      const invoice = sorted[i];
+  
+      if (i === 0) {
+        // first invoice always starts a new cycle
+        currentCycle.push(invoice);
+        continue;
+      }
+  
+      const prev = sorted[i - 1];
+  
+      const planChanged = invoice.pricingPlanId !== prev.pricingPlanId;
+  
+      // If plan changed → new billing cycle
+      if (planChanged) {
+        cycles.push(currentCycle);
+        currentCycle = [invoice];
+      } else {
+        // Same plan → continue same cycle
+        currentCycle.push(invoice);
+      }
+    }
+  
+    // push last cycle
+    if (currentCycle.length > 0) cycles.push(currentCycle);
+  
+    return cycles;
+  }
+
   return (
     <>
     <div
@@ -192,7 +231,7 @@ export default function SpecificInvoice() {
 
       {/* Title + Date */}
       <div className="flex justify-between mb-4 mt-10">
-        <h3 className="text-xl font-bold">{invoice.status === "pending" ? "Proforma Invoice" : invoice.status === "paid" ? "Tax Invoice" : ""}</h3>
+        <h3 className="text-xl font-bold">{invoice.status === "pending" ? "Proforma Invoice" : invoice.status === "paid" ? "Tax Invoice" : invoice.status === "partially paid" ? "Proforma Invoice (partially paid)" : ""}</h3>
         <p>Date: {new Date().toLocaleDateString("en-GB")}</p>
       </div>
 
@@ -272,7 +311,8 @@ export default function SpecificInvoice() {
           
           {/* PAYMENT HISTORY UP TO THIS INVOICE */}
           {(() => {
-            const invoices = restaurant.invoices || [];
+            const cycles = groupInvoicesIntoCycles(restaurant.invoices || []);
+            const invoices = cycles.length > 0 ? cycles[cycles.length - 1] : [];
             const sorted = [...invoices].sort((a, b) => a.id - b.id); // oldest → latest
             const indexOfCurrent = sorted.findIndex((inv) => inv.id === specificInvId);
 

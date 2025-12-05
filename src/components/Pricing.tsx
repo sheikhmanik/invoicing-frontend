@@ -764,7 +764,7 @@ export default function Pricing() {
                                   <div className="flex flex-col gap-2">
                                     <div className="flex flex-col gap-1">
                                       <label className="text-xs font-medium text-gray-600">
-                                        Credits
+                                        Credits per unit
                                         <span className="text-gray-400 ml-1">(required)</span>
                                       </label>
                                       <input
@@ -992,8 +992,9 @@ export default function Pricing() {
                                       {hp.unlimitedUsage === false && (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1 w-full">
                                           <div className="flex flex-col gap-1">
-                                            <label className="text-xs font-medium text-gray-700">
-                                              No. of units
+                                            <label className="text-xs font-medium text-gray-600">
+                                              No. of Units included
+                                              <span className="text-gray-400 ml-1">(required)</span>
                                             </label>
                                             <input
                                               type="number"
@@ -1018,8 +1019,9 @@ export default function Pricing() {
                                           </div>
 
                                           <div className="flex flex-col gap-1">
-                                            <label className="text-xs font-medium text-gray-700">
-                                              Credits per unit
+                                            <label className="text-xs font-medium text-gray-600">
+                                              Credits per unit post "included units"
+                                              <span className="text-gray-400 ml-1">(required)</span>
                                             </label>
                                             <input
                                               type="number"
