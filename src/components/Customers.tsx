@@ -257,7 +257,8 @@ export default function Customers() {
   useEffect(() => {
     axios.get(`${API}/restaurant`).then((res) => {
       setRestaurants(res.data);
-      const paid = res.data?.filter((res: any) => res.invoices.length > 0 &&  res.invoices.at(-1).status === "paid");
+      // const paid = res.data?.filter((res: any) => res.invoices.length > 0 &&  res.invoices.at(-1).status === "paid");
+      const paid = res.data?.filter((res: any) => res.invoices?.length > 0 && res.invoices?.filter((inv: any) => inv === "paid"));
       const unpaid = res.data?.filter((res: any) => 
         res.invoices.length > 0 &&  res.invoices.at(-1).status === "pending" ||
         res.invoices.length > 0 &&  res.invoices.at(-1).status === "partially paid"
@@ -743,6 +744,17 @@ export default function Customers() {
                             >
                               Invoice
                             </Link>
+                            {r.invoices.at(-1)?.status !== "paid" && (
+                              <button
+                                onClick={() => {
+                                  serCurrentResId(r.id)
+                                  setUpdatePayment(true)
+                                }}
+                                className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                              >
+                                Update Payment
+                              </button>
+                            )}
                           </div>
 
                         </td>
@@ -817,18 +829,23 @@ export default function Customers() {
                             }
 
                             const latest = invoices.at(-1);
-
-                            return (
-                              <div className="space-y-1 text-xs text-center">
-                                <div className="font-semibold text-green-700">Fully Paid ✓</div>
-                                <div className="text-gray-800">
-                                  {latest.paymentDate?.split("T")[0] ?? "—"}
+                            if (latest.status === "paid") {
+                              return (
+                                <div className="space-y-1 text-xs text-center">
+                                  <div className="font-semibold text-green-700">Fully Paid ✓</div>
+                                  <div className="text-gray-800">
+                                    {latest.paymentDate?.split("T")[0] ?? "—"}
+                                  </div>
+                                  <div className="text-green-700 font-medium">
+                                    Tax Invoice
+                                  </div>
                                 </div>
-                                <div className="text-green-700 font-medium">
-                                  Tax Invoice
-                                </div>
-                              </div>
-                            );
+                              );
+                            } else {
+                              return (
+                                "-"
+                              )
+                            }
 
                           })()}
                         </td>
