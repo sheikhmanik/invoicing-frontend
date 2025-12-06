@@ -127,11 +127,11 @@ export default function SpecificInvoice() {
       .finally(() => setLoading(false));
   }, []);
 
-  // useEffect(() => {
-  //   if (!loading && restaurant) {
-  //     setTimeout(() => window.print(), 500);
-  //   }
-  // }, [loading, restaurant]);
+  useEffect(() => {
+    if (!loading && restaurant) {
+      setTimeout(() => window.print(), 500);
+    }
+  }, [loading, restaurant]);
 
   if (loading) {
     return <div className="text-center my-20">Loading invoice...</div>;
