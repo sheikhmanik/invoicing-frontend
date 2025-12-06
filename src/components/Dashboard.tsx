@@ -10,6 +10,9 @@ import AddProduct from "./AddProduct";
 import axios from "axios";
 import CustomerWizard from "./create-customer/wizard/CustomerWizard";
 import PlanListing from "./PlanListing";
+import PaidInvoices from "./invoice-list/PaidInvoices";
+import UnpaidInvoices from "./invoice-list/UnpaidInvoices";
+import InvoiceList from "./InvoiceList";
 
 export default function Dashboard() {
 
@@ -75,10 +78,7 @@ export default function Dashboard() {
 
           <nav className="space-y-1 text-sm">
             {[
-              "Dashboard", "Customers", "Create Customer", "Add Business", "Add Brand", "Add Restaurant", "Plan Listing", "Pricing plan setup", "Add Product", "Create Proforma", "Create Invoice",
-              "Pending Invoices", "Paid Invoices",
-              "MRR / ARR", "Churn"
-            ].map((item) => (
+              "Dashboard", "Customers", "Invoice List", "Create Customer", "Add Business", "Add Brand", "Add Restaurant", "Plan Listing", "Pricing plan setup", "Add Product", "Create Proforma", "Create Invoice", "Pending Invoices", "MRR / ARR", "Churn"].map((item) => (
               <a
                 key={item}
                 onClick={() => setDisplay(item)}
@@ -185,7 +185,11 @@ export default function Dashboard() {
           )}
 
           {display === "Customers" && (
-            <Customers onDone={() => setDisplay("Customers")} />
+            <Customers/>
+          )}
+          
+          {display === "Invoice List" && (
+            <InvoiceList/>
           )}
 
           {display === "Create Customer" && (
