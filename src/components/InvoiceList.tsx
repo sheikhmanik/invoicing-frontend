@@ -18,16 +18,17 @@ export default function InvoiceList() {
   });
 
   const [restaurants, setRestaurants] = useState<any[]>([]);
+  const [allInvoices, setAllInvoices] = useState<any[]>([]);
   const [paidCustomers, setPaidCustomers] = useState<any[]>([]);
   const [unpaidCustomers, setUnpaidCustomers] = useState<any[]>([]);
 
   useEffect(() => {
     axios.get(`${API}/invoices`).then((res: any) => {
-      const paid = res.data?.filter((inv: any) => inv.status === "paid");
-      const unpaid = res.data?.filter((inv: any) => inv.status === "pending" || inv.status === "partially paid");
+      const paid = res.data?.filter((inv: any) => inv.status === "paid" || inv.status === "partially paid");
+      const unpaid = res.data?.filter((inv: any) => inv.status === "pending");
+      if (res.data) setAllInvoices(res.data);
       if (paid) setPaidCustomers(paid);
       if (unpaid) setUnpaidCustomers(unpaid);
-      // console.log("Invoices:", res.data);
     })
   }, []);
 
@@ -65,7 +66,7 @@ export default function InvoiceList() {
       {display === "unpaid" ? (
         <UnpaidInvoices unpaidInvoices={unpaidCustomers} />
       ) : (
-        <PaidInvoices paidInvoices={paidCustomers} />
+        <PaidInvoices paidInvoices={paidCustomers} allInvoices={allInvoices} />
       )}
     </div>
   );

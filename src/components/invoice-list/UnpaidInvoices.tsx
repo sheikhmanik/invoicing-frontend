@@ -104,7 +104,6 @@ export default function UnpaidInvoices({ unpaidInvoices }: { unpaidInvoices: any
             <th className="p-4 border-r text-center font-semibold">Business</th>
             <th className="p-4 border-r text-center font-semibold">Store</th>
             <th className="p-4 border-r text-center font-semibold">Proforma Number</th>
-            <th className="p-4 border-r text-center font-semibold">Invoice Number</th>
             <th className="p-4 border-r text-center font-semibold">Total Amount</th>
             <th className="p-4 border-r text-center font-semibold">Due Date</th>
             <th className="p-4 border-r text-center font-semibold">Status</th>
@@ -117,7 +116,10 @@ export default function UnpaidInvoices({ unpaidInvoices }: { unpaidInvoices: any
             unpaidInvoices.map((invoice) => {
               const businessName =
                 invoice?.restaurant?.brand?.business?.name ?? "N/A";
+              const businessLocation =
+                invoice?.restaurant?.brand?.business?.location ?? "N/A";
               const storeName = invoice?.restaurant?.name ?? "N/A";
+              const storeAddress = invoice?.restaurant?.address ?? "N/A";
               const proformaNumber = invoice?.proformaNumber ?? "N/A";
               const invoiceNumber = invoice?.invoiceNumber ?? "N/A";
               const totalAmount =
@@ -141,18 +143,25 @@ export default function UnpaidInvoices({ unpaidInvoices }: { unpaidInvoices: any
                   key={invoice.id}
                   className="border-b last:border-0 hover:bg-blue-50 transition-all"
                 >
-                  <td className="p-4 border-r text-center font-medium">
-                    {businessName}
+                  <td className="p-4 border-r text-center">
+                    <div className="flex flex-col items-center">
+                      <span className="font-semibold text-gray-900">{businessName}</span>
+                      <span className="text-xs text-gray-500 mt-1">
+                        {businessLocation}
+                      </span>
+                    </div>
                   </td>
                   <td className="p-4 border-r text-center">
-                    {storeName}
-                  </td>
-                  <td className="p-4 border-r text-center ">
-                    <span>{proformaNumber}</span>
+                    <div className="flex flex-col items-center">
+                      <span className="font-medium text-gray-900">{storeName}</span>
+                      <span className="text-xs text-gray-500 mt-1">
+                        {storeAddress}
+                      </span>
+                    </div>
                   </td>
                   <td className="p-4 border-r text-center text-blue-700 font-semibold">
                     <div className="flex flex-col gap-1">
-                      <p>{invoiceNumber}</p>
+                      <p>{proformaNumber}</p>
                       <Link
                         href={`/invoice/${invoice.restaurant.id}/specific/${invoice.id}`}
                         target="_blank"

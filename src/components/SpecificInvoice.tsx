@@ -72,8 +72,9 @@ interface PricingPlan {
   planName: string;
 }
 
-interface RestaurantInvoice {
+interface Invoice {
   id: number;
+  proformaNumber: string;
   invoiceNumber: string;
   subTotalAmount: number;
   totalAmount: number;
@@ -95,7 +96,7 @@ interface RestaurantBrand {
 
 interface Restaurant {
   name: string;
-  invoices: RestaurantInvoice[];
+  invoices: Invoice[];
   restaurantPricingPlans: { 
     pricingPlan: PricingPlan,
     cgst: boolean,
@@ -127,11 +128,11 @@ export default function SpecificInvoice() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    if (!loading && restaurant) {
-      setTimeout(() => window.print(), 500);
-    }
-  }, [loading, restaurant]);
+  // useEffect(() => {
+  //   if (!loading && restaurant) {
+  //     setTimeout(() => window.print(), 500);
+  //   }
+  // }, [loading, restaurant]);
 
   if (loading) {
     return <div className="text-center my-20">Loading invoice...</div>;
@@ -251,7 +252,11 @@ export default function SpecificInvoice() {
 
       {/* Invoice Details */}
       <div className="mb-4 text-sm">
-        <p>Inv No. {invoice.invoiceNumber}</p>
+        {invoice.status === "pending" ? (
+          <p>Proforma No. {invoice.proformaNumber}</p>
+        ) : (
+          <p>Invoice No. {invoice.invoiceNumber}</p>
+        )}
         <p>GSTIN: 33AADCE1170H2Z2</p>
         <p>PAN: AADCE1170H</p>
       </div>
