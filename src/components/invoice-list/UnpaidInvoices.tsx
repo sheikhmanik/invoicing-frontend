@@ -12,6 +12,7 @@ interface Restaurant {
 
 interface Invoice {
   id: string;
+  createdAt: string;
   proformaNumber: string;
   invoiceNumber: string;
   totalAmount: number;
@@ -27,7 +28,7 @@ interface Invoice {
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
-export default function UnpaidInvoices({ unpaidInvoices }: { unpaidInvoices: any[] }) {
+export default function UnpaidInvoices({ allInvoices, unpaidInvoices }: { allInvoices: any[], unpaidInvoices: any[] }) {
 
   const [updatePayment, setUpdatePayment] = useState(false);
   const [currentRestaurant, setCurrentRestaurant] = useState<Restaurant[]>([]);
@@ -93,7 +94,38 @@ export default function UnpaidInvoices({ unpaidInvoices }: { unpaidInvoices: any
     }
   }
 
-  console.log(currentInvoice, currentRestaurant)
+  function getLatestPendingInvoicesByProforma(allInvoices: Invoice[]) {
+    const latestByProforma: Record<string, Invoice> = {};
+  
+    for (const inv of allInvoices) {
+      if (!inv.proformaNumber) continue; // skip weird ones
+  
+      const key = inv.proformaNumber;
+  
+      const existing = latestByProforma[key];
+  
+      // if no invoice stored yet OR this one is newer → replace
+      if ( !existing || new Date(inv.createdAt).getTime() > new Date(existing.createdAt).getTime()) {
+        latestByProforma[key] = inv;
+      }
+    }
+  
+    // Now `latestByProforma` holds latest invoice (any status) for each proforma.
+    // Filter only the ones that are still pending:
+    return Object.values(latestByProforma).filter(
+      (inv) => inv.status === "pending"
+    );
+  }
+
+  // Build a set of IDs that are actually the latest pending invoices per proforma
+  const latestPending = getLatestPendingInvoicesByProforma(allInvoices);
+  console.log("Latest pending invoices by proforma:", latestPending);
+  const latestPendingIds = new Set(latestPending.map((inv) => inv.id));
+
+  // Filter your existing `unpaidInvoices` using those IDs
+  const visibleInvoices = unpaidInvoices.filter((inv) =>
+    latestPendingIds.has(inv.id)
+  );
 
   return (
     <>
@@ -112,23 +144,22 @@ export default function UnpaidInvoices({ unpaidInvoices }: { unpaidInvoices: any
         </thead>
 
         <tbody className="text-gray-800">
-          {unpaidInvoices?.length > 0 ? (
-            unpaidInvoices.map((invoice) => {
-              const businessName =
-                invoice?.restaurant?.brand?.business?.name ?? "N/A";
-              const businessLocation =
-                invoice?.restaurant?.brand?.business?.location ?? "N/A";
+          {visibleInvoices?.length > 0 ? (
+            visibleInvoices.map((invoice) => {
+              const businessName = invoice?.restaurant?.brand?.business?.name ?? "N/A";
+              const businessLocation = invoice?.restaurant?.brand?.business?.location ?? "N/A";
               const storeName = invoice?.restaurant?.name ?? "N/A";
               const storeAddress = invoice?.restaurant?.address ?? "N/A";
               const proformaNumber = invoice?.proformaNumber ?? "N/A";
-              const invoiceNumber = invoice?.invoiceNumber ?? "N/A";
               const totalAmount =
                 typeof invoice?.totalAmount === "number"
                   ? invoice.totalAmount.toLocaleString("en-IN")
-                  : invoice?.totalAmount ?? "N/A";
+                  : invoice?.totalAmount ?? "N/A"
+              ;
               const dueDate = invoice?.dueDate
                 ? new Date(invoice.dueDate).toLocaleDateString("en-IN")
-                : "N/A";
+                : "N/A"
+              ;
               const status = invoice?.status ?? "N/A";
 
               const statusColor =
@@ -136,7 +167,8 @@ export default function UnpaidInvoices({ unpaidInvoices }: { unpaidInvoices: any
                   ? "bg-green-100 text-green-700"
                   : status === "pending"
                   ? "bg-yellow-100 text-yellow-700"
-                  : "bg-gray-200 text-gray-700";
+                  : "bg-gray-200 text-gray-700"
+              ;
 
               return (
                 <tr

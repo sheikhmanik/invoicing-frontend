@@ -124,7 +124,6 @@ export default function Customers() {
   const [updatingPayment, setUpdatingPayment] = useState(false);
   const [assigningPlanId, setAssigningPlanId] = useState<number | null>(null);
   const [newInvCreationModal, setNewInvCreationModal] = useState(false);
-  const [newInvoiceCreation, setNewInvoiceCreation] = useState<"yes" | "no" | null>(null);
 
   async function selectRestaurant(restaurantId: any) {
     setCurrentPlan(undefined);
@@ -143,7 +142,7 @@ export default function Customers() {
     }
   }
 
-  async function handleAssignPlan(restaurantId: number, pricingPlanId: number, confirm: boolean) {
+  async function handleAssignPlan(restaurantId: number, pricingPlanId: number, confirm: boolean, newInvoiceCreation: "yes" | "no") {
     if (!startDate) return alert("Please include start date.");
     if (!planMode) return alert("Please include plan mode.");
     if (planMode === "trial" && !trialDays) return alert("Please include trial days.");
@@ -156,14 +155,13 @@ export default function Customers() {
       startDate,
       planMode,
       trialDays: planMode === "trial" ? trialDays : null,
-      newInvoiceCreation: currentPlan ? newInvoiceCreation : null,
+      newInvoiceCreation,
     }
     try {
       // console.log(payload); return;
       await axios.post(`${API}/restaurant/assign-plan`, payload);
       alert("Plan assigned successfully!");
       setPlanEditingModal(false);
-      setNewInvoiceCreation(null);
       window.location.reload();
     } catch (err: any) {
       console.log(err);
@@ -172,7 +170,6 @@ export default function Customers() {
     } finally {
       setAssigningPlan(false);
       setAssigningPlanId(null);
-      setNewInvoiceCreation(null);
     }
   }
 
@@ -1443,15 +1440,9 @@ export default function Customers() {
                   <div className="mt-4 flex gap-2">                    
                     <button
                       onClick={() => {
-                        if (currentPlan) {
-                          setNewInvCreationModal(true);
-                          setSelectedPricingPlanId(plan?.id);
-                          setAssigningPlanId(plan.id);
-                        } else {
-                          setConfirmAssignModal(true);
-                          setSelectedPricingPlanId(plan?.id);
-                          setAssigningPlanId(plan.id);
-                        } 
+                        setConfirmAssignModal(true);
+                        setSelectedPricingPlanId(plan?.id);
+                        setAssigningPlanId(plan.id);
                       }}
                       disabled={(currentPlan && currentPlan.id === plan.id) || assigningPlan}
                       className={`
@@ -1866,53 +1857,6 @@ export default function Customers() {
           </div>
         </div>
       )}
-
-      {newInvCreationModal && (
-        <div
-          onClick={() => {
-            setNewInvCreationModal(false);
-          }}
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white w-full max-w-md rounded-2xl shadow-xl p-6 space-y-6 text-center border border-gray-200 animate-slideUp"
-          >
-            {/* Icon */}
-            <div className="text-5xl text-red-600">⚠️</div>
-
-            {/* Text */}
-            <h2 className="text-lg font-bold text-gray-900">
-              Should it create new invoice?
-            </h2>
-
-            {/* Buttons */}
-            <div className="flex items-center justify-center gap-4">
-              <button
-                className="px-5 py-2.5 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100 transition-all"
-                onClick={() => {
-                  setNewInvoiceCreation("no");
-                  setNewInvCreationModal(false);
-                  setConfirmAssignModal(true);
-                }}
-              >
-                No
-              </button>
-
-              <button
-                className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-red-600 text-white shadow hover:bg-red-700 focus:ring-2 focus:ring-red-400 transition-all"
-                onClick={() => {
-                  setNewInvoiceCreation("yes");
-                  setNewInvCreationModal(false);
-                  setConfirmAssignModal(true);
-                }}
-              >
-                Yes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       
       {confirmAssignModal && (
         <div
@@ -1939,7 +1883,6 @@ export default function Customers() {
                 className="px-5 py-2.5 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100 transition-all"
                 onClick={() => {
                   setConfirmAssignModal(false);
-                  setNewInvoiceCreation(null);
                   setSelectedPricingPlanId(null);
                   setAssigningPlanId(null);
                 }}
@@ -1951,12 +1894,59 @@ export default function Customers() {
                 className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-red-600 text-white shadow hover:bg-red-700 focus:ring-2 focus:ring-red-400 transition-all"
                 onClick={() => {
                   setConfirmAssignModal(false)
-                  if (selectedRestaurant?.id && selectedPricingPlanId) {
-                    handleAssignPlan(selectedRestaurant.id, selectedPricingPlanId, true);
-                  }
+                  setNewInvCreationModal(true);
                 }}
               >
                 Yes, Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {newInvCreationModal && (
+        <div
+          onClick={() => {
+            setNewInvCreationModal(false);
+          }}
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white w-full max-w-md rounded-2xl shadow-xl p-6 space-y-6 text-center border border-gray-200 animate-slideUp"
+          >
+            {/* Icon */}
+            <div className="text-5xl text-red-600">⚠️</div>
+
+            {/* Text */}
+            <h2 className="text-lg font-bold text-gray-900">
+              Do you want to create new invoice?
+            </h2>
+
+            {/* Buttons */}
+            <div className="flex items-center justify-center gap-4">
+              <button
+                className="px-5 py-2.5 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100 transition-all"
+                onClick={() => {
+                  setNewInvCreationModal(false);
+                  if (selectedRestaurant?.id && selectedPricingPlanId) {
+                    handleAssignPlan(selectedRestaurant.id, selectedPricingPlanId, true, "no");
+                  }
+                }}
+              >
+                No
+              </button>
+
+              <button
+                className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-red-600 text-white shadow hover:bg-red-700 focus:ring-2 focus:ring-red-400 transition-all"
+                onClick={() => {
+                  setNewInvCreationModal(false);
+                  if (selectedRestaurant?.id && selectedPricingPlanId) {
+                    handleAssignPlan(selectedRestaurant.id, selectedPricingPlanId, true, "yes");
+                  }
+                }}
+              >
+                Yes
               </button>
             </div>
           </div>
