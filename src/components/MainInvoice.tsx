@@ -231,7 +231,9 @@ export default function ProformaInvoice() {
 
       {/* Title + Date */}
       <div className="flex justify-between mb-4 mt-10">
-        <h3 className="text-xl font-bold">{invoice.status === "pending" ? "Proforma Invoice" : invoice.status === "paid" ? "Tax Invoice" : invoice.status === "partially paid" ? "Proforma Invoice (partially paid)" : ""}</h3>
+        <h3 className="text-xl font-bold">
+          { invoice.status === "pending" ? "Proforma Invoice" : "Tax Invoice" }
+        </h3>
         <p>Date: {new Date().toLocaleDateString("en-GB")}</p>
       </div>
 
@@ -324,9 +326,18 @@ export default function ProformaInvoice() {
               ?.sort(
                 (a: any, b: any) =>
                   new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()
-              );
+              )
+            ;
 
-            if (!partials || partials.length === 0) return null;
+            if (!partials || partials.length === 0) {
+              return (
+                <tr className="bg-red-50">
+                  <td colSpan={4} className="border p-2 text-center text-red-600 italic">
+                    No payments made yet
+                  </td>
+                </tr>
+              );
+            }
 
             return partials.map((inv: any, index: number) => {
               const isLatest = index === partials.length - 1;

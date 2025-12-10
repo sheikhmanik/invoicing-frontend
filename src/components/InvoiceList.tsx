@@ -64,7 +64,7 @@ export default function InvoiceList() {
         >Paid Invoices</button>
       </div>
       {display === "unpaid" ? (
-        <UnpaidInvoices unpaidInvoices={unpaidCustomers} allInvoices={allInvoices} />
+        <UnpaidInvoices allInvoices={allInvoices} />
       ) : (
         <PaidInvoices allInvoices={allInvoices} />
       )}

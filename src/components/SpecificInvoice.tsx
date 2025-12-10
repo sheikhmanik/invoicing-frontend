@@ -239,13 +239,7 @@ export default function SpecificInvoice() {
       {/* Title + Date */}
       <div className="flex justify-between mb-4 mt-10">
         <h3 className="text-xl font-bold">
-          {invoice.status === "pending"
-            ? "Proforma Invoice"
-            : invoice.status === "paid"
-            ? "Tax Invoice"
-            : invoice.status === "partially paid"
-            ? "Proforma Invoice (partially paid)"
-            : ""}
+          { invoice.status === "pending" ? "Proforma Invoice" : "Tax Invoice" }
         </h3>
         <p>Date: {new Date().toLocaleDateString("en-GB")}</p>
       </div>
