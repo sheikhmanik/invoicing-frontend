@@ -7,6 +7,12 @@ interface Restaurant {
   id: string;
   name: string;
   invoices: any[];
+  brand: {
+    business: {
+      name: string;
+      location: string;
+    };
+  };
 }
 
 interface Invoice {
@@ -25,10 +31,17 @@ interface Invoice {
   restaurant: Restaurant;
 }
 
+type SearchField = 
+  | "proformaNumber"
+  | "invoiceNumber"
+  | "storeName"
+  | "businessName"
+;
+
 export default function PaidInvoices({ allInvoices }: { allInvoices: any[] }) {
 
   const [searchText, setSearchText] = useState("");
-  const [searchField, setSearchField] = useState("all");
+  const [searchField, setSearchField] = useState<SearchField>("proformaNumber");
 
   function groupInvoicesByProforma(allInvoices: any[]) {
     const groups: Record<string, any[]> = {};
@@ -56,7 +69,6 @@ export default function PaidInvoices({ allInvoices }: { allInvoices: any[] }) {
 
   const proformaGroups = groupInvoicesByProforma(allInvoices);
   const latestPaidInvoices = getLatestPaidInvoices(proformaGroups);
-  console.log("Latest Paid Invoices:", latestPaidInvoices);
 
   const paymentHistoryMap = new Map(
     latestPaidInvoices.map((latestInv) => {
@@ -79,64 +91,70 @@ export default function PaidInvoices({ allInvoices }: { allInvoices: any[] }) {
 
   // 🔍 Search logic
   const filteredInvoices = useMemo(() => {
-    if (!searchText.trim()) return allInvoices; // show all when empty
-
+    if (!searchText.trim()) return latestPaidInvoices;
+  
     const text = searchText.toLowerCase();
-
-    return allInvoices.filter((inv: any) => {
-      const matchField = (field: string) =>
-        inv[field]?.toString().toLowerCase().includes(text);
-
+  
+    return latestPaidInvoices.filter((inv: any) => {
+      
+      const match = (field: SearchField) => inv[field]?.toString().toLowerCase().includes(text);
+  
       switch (searchField) {
         case "proformaNumber":
-          return matchField("proformaNumber");
+          return match("proformaNumber");
         case "invoiceNumber":
-          return matchField("invoiceNumber");
-        case "customerName":
+          return match("invoiceNumber");
+        case "storeName":
           return inv.restaurant?.name?.toLowerCase().includes(text);
         case "businessName":
           return inv.restaurant?.brand?.business?.name
             ?.toLowerCase()
             .includes(text);
-        case "all":
         default:
           return (
-            matchField("invoiceNumber") ||
-            matchField("proformaNumber") ||
+            match("invoiceNumber") ||
+            match("proformaNumber") ||
             inv.restaurant?.name?.toLowerCase().includes(text) ||
             inv.restaurant?.brand?.business?.name?.toLowerCase().includes(text)
           );
       }
     });
-  }, [searchText, searchField, allInvoices]);
-
-  // send filtered results to the parent (UI updates live)
-  // onResults(filteredInvoices);
+  }, [searchText, searchField, latestPaidInvoices]);
 
   return (
     <div className="flex flex-col">
-      <div className="flex gap-2 items-center p-3 bg-gray-100 rounded-lg border mb-4">
-        {/* Search Box */}
+      <div className="flex gap-2 items-center p-3 bg-gray-100 rounded-lg border mb-4 w-full">
+        <div className="relative">
+          <select
+            value={searchField}
+            onChange={(e) => setSearchField(e.target.value as SearchField)}
+            className="
+              appearance-none   /* HIDE default arrow */
+              px-3 py-2 
+              pr-10             /* space for custom arrow */
+              rounded-md 
+              border border-gray-300 
+              outline-none 
+              focus:ring-2 focus:ring-blue-500 
+              text-sm
+            "
+          >
+            <option value="proformaNumber">Proforma Number</option>
+            <option value="invoiceNumber">Invoice Number</option>
+            <option value="businessName">Business Name</option>
+            <option value="storeName">Store Name</option>
+          </select>
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
+            ▼
+          </span>
+        </div>
         <input
           type="text"
           placeholder="Search here..."
-          className="px-3 py-2 rounded-md border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500 w-64 text-sm"
+          className="px-3 py-2 rounded-md border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
         />
-
-        {/* Search Filter Selector */}
-        <select
-          className="px-2 py-2 rounded-md border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          value={searchField}
-          onChange={(e) => setSearchField(e.target.value)}
-        >
-          <option value="all">All Fields</option>
-          <option value="proformaNumber">Proforma Number</option>
-          <option value="invoiceNumber">Invoice Number</option>
-          <option value="customerName">Customer Name</option>
-          <option value="businessName">Business Name</option>
-        </select>
       </div>
       <div className="overflow-x-auto bg-white shadow-xl rounded-xl border border-gray-200">
         <table className="w-full text-sm">
@@ -154,8 +172,8 @@ export default function PaidInvoices({ allInvoices }: { allInvoices: any[] }) {
           </thead>
 
           <tbody className="text-gray-800">
-            {latestPaidInvoices?.length > 0 ? (
-              latestPaidInvoices.map((invoice) => {
+            {filteredInvoices?.length > 0 ? (
+              filteredInvoices.map((invoice) => {
                 const businessName =
                   invoice?.restaurant?.brand?.business?.name ?? "N/A";
                 const businessLocation =
@@ -188,7 +206,6 @@ export default function PaidInvoices({ allInvoices }: { allInvoices: any[] }) {
                 );
 
                 const payments = paymentHistoryMap.get(invoice.id);
-                console.log("Payments for invoice", invoice.id, payments);
 
                 return (
                   <tr
@@ -203,7 +220,7 @@ export default function PaidInvoices({ allInvoices }: { allInvoices: any[] }) {
                         </span>
                       </div>
                     </td>
-                    <td className="p-4 border-r text-center">
+                    <td className="p-4 border-r text-center max-w-36">
                       <div className="flex flex-col items-center">
                         <span className="font-medium text-gray-900">{storeName}</span>
                         <span className="text-xs text-gray-500 mt-1">
