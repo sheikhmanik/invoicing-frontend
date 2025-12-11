@@ -441,62 +441,66 @@ export default function Customers() {
                         </td>
     
                         {/* PROFORMA */}
-                        <td className="p-4 border-r text-center text-xs space-y-3">
-    
-                          {/* Due Date */}
-                          <div>
-                            <p className="text-gray-500">Due Date</p>
-                            <p className="font-semibold">
-                              {r.invoices?.[r.invoices.length - 1]?.dueDate?.split("T")[0] ?? "--"}
-                            </p>
-                          </div>
-    
-                          {/* Total Amount */}
-                          <div>
-                            <p className="text-gray-500">Total Amount</p>
-                            <p className="font-semibold">
-                              {r.invoices?.[r.invoices.length - 1]?.totalAmount ?? "--"}
-                            </p>
-                          </div>
-    
-                          {/* Status */}
-                          <div>
-                            <p className="text-gray-500">Status</p>
-                            <p
-                              className={`font-semibold capitalize ${
-                                r.invoices?.[r.invoices.length - 1]?.status === "paid"
-                                  ? "text-green-600"
-                                  : r.invoices?.[r.invoices.length - 1]?.status === "overdue"
-                                  ? "text-red-600"
-                                  : "text-yellow-600"
-                              }`}
-                            >
-                              {r.invoices?.[r.invoices.length - 1]?.status ?? "--"}
-                            </p>
-                          </div>
-    
-                          <div className="flex flex-col gap-2">
-                            <Link
-                              href={`/invoice/${r.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
-                            >
-                              Invoice
-                            </Link>
-                            {r.invoices.at(-1)?.status !== "paid" && (
-                              <button
-                                onClick={() => {
-                                  serCurrentResId(r.id)
-                                  setUpdatePayment(true)
-                                }}
-                                className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
-                              >
-                                Update Payment
-                              </button>
-                            )}
-                          </div>
-    
+                        <td className="p-4 border-r text-center">
+                          {r.invoices?.length > 0 ? (
+                            <div className="text-xs space-y-3">
+                              {/* Due Date */}
+                              <div>
+                                <p className="text-gray-500">Due Date</p>
+                                <p className="font-semibold">
+                                  {r.invoices?.[r.invoices.length - 1]?.dueDate?.split("T")[0] ?? "--"}
+                                </p>
+                              </div>
+        
+                              {/* Total Amount */}
+                              <div>
+                                <p className="text-gray-500">Total Amount</p>
+                                <p className="font-semibold">
+                                  {r.invoices?.[r.invoices.length - 1]?.totalAmount ?? "--"}
+                                </p>
+                              </div>
+        
+                              {/* Status */}
+                              <div>
+                                <p className="text-gray-500">Status</p>
+                                <p
+                                  className={`font-semibold capitalize ${
+                                    r.invoices?.[r.invoices.length - 1]?.status === "paid"
+                                      ? "text-green-600"
+                                      : r.invoices?.[r.invoices.length - 1]?.status === "overdue"
+                                      ? "text-red-600"
+                                      : "text-yellow-600"
+                                  }`}
+                                >
+                                  {r.invoices?.[r.invoices.length - 1]?.status ?? "--"}
+                                </p>
+                              </div>
+        
+                              <div className="flex flex-col gap-2">
+                                <Link
+                                  href={`/invoice/${r.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                                >
+                                  Invoice
+                                </Link>
+                                {r.invoices.at(-1)?.status !== "paid" && (
+                                  <button
+                                    onClick={() => {
+                                      serCurrentResId(r.id)
+                                      setUpdatePayment(true)
+                                    }}
+                                    className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                                  >
+                                    Update Payment
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
                         </td>
     
                         {/* PENDING */}
@@ -505,7 +509,7 @@ export default function Customers() {
                             {r.invoices?.[r.invoices.length - 1]?.status === "pending"
                             || r.invoices?.[r.invoices.length - 1]?.status === "partially paid" ? (
                               <p>{r.invoices?.[r.invoices.length - 1]?.remainingAmount}</p>
-                            ) : "-"}
+                            ) : <span className="text-gray-400 text-xs">—</span>}
                           </div>
                         </td>
 
@@ -611,17 +615,17 @@ export default function Customers() {
     
                         {/* INITIAL CHURN */}
                         <td className="p-4 border-r text-center font-medium">
-                          -
+                          <span className="text-gray-400">—</span>
                         </td>
     
                         {/* CHURN */}
                         <td className="p-4 border-r text-center font-medium">
-                          -
+                          <span className="text-gray-400">—</span>
                         </td>
     
                         {/* UPDATE ACTIONS */}
                         <td className="p-4 text-center space-y-2">
-                          -
+                          <span className="text-gray-400">—</span>
                         </td>
                       </tr>
                     ))}
