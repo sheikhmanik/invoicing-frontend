@@ -13,6 +13,7 @@ import PlanListing from "./PlanListing";
 import PaidInvoices from "./invoice-list/PaidInvoices";
 import UnpaidInvoices from "./invoice-list/UnpaidInvoices";
 import InvoiceList from "./InvoiceList";
+import CreateInvoice from "./CreateInvoice";
 
 export default function Dashboard() {
 
@@ -218,6 +219,10 @@ export default function Dashboard() {
 
           {display === "Add Product" && (
             <AddProduct/>
+          )}
+          
+          {display === "Create Invoice" && (
+            <CreateInvoice/>
           )}
 
         </main>
