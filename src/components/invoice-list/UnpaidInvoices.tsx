@@ -180,7 +180,7 @@ export default function UnpaidInvoices({ allInvoices, latestUnpaidInvoices }: Pr
   const latestUnpaidInvs = getLatestUnpaidInvoices(proformaGroups);
 
   const paymentHistoryMap = new Map(
-    latestUnpaidInvoices.map((latestInv) => {
+    latestUnpaidInvs.map((latestInv) => {
       const related = proformaGroups[latestInv.proformaNumber] || [];
   
       const paymentsOnly = related.filter(

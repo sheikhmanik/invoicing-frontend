@@ -11,18 +11,15 @@ export default function CreateInvoice() {
   const [business, setBusiness] = useState("");
   const [brands, setBrands] = useState<any[]>([]);
   const [stores, setStores] = useState<any[]>([]);
-  // const [plan, setPlan] = useState<any[]>([]);
+  const [plans, setPlans] = useState<any[]>([]);
 
   const [brand, setBrand] = useState("");
   const [store, setStore] = useState("");
   const [plan, setPlan] = useState("");
 
-  const [brandId, setBrandId] = useState<number | null>(null);
   const [storeId, setStoreId] = useState<number | null>(null);
   const [planId, setPlanId] = useState<number | null>(null);
 
-  const [invoiceNo, setInvoiceNo] = useState("");
-  const [invoiceDate, setInvoiceDate] = useState("");
   const [displayDate, setDisplayDate] = useState("");
 
   const [duration, setDuration] = useState("1 Month");
@@ -31,29 +28,44 @@ export default function CreateInvoice() {
   const [discountType, setDiscountType] = useState<"percent" | "fixed">("percent");
   const [discountValue, setDiscountValue] = useState(0);
 
-  const [taxEnabled, setTaxEnabled] = useState(true);
   const [taxAmount, setTaxAmount] = useState(0);
+  const [taxSettings, setTaxSettings] = useState({
+    CGST: false,
+    SGST: false,
+    IGST: false,
+    LUT: false,
+  });
 
   const [totalAmount, setTotalAmount] = useState(0);
+  const [erros, setErrors] = useState("");
 
   useEffect(() => {
     let discounted = subtotal;
 
+    // Apply discount
     if (discountType === "percent") {
       discounted -= (subtotal * discountValue) / 100;
     } else {
       discounted -= discountValue;
     }
 
-    const tax = taxEnabled ? discounted * 0.18 : 0;
+    let tax = 0;
+
+    // 🔥 Independent tax calculations
+    if (taxSettings.CGST) tax += discounted * 0.09;
+    if (taxSettings.SGST) tax += discounted * 0.09;
+    if (taxSettings.IGST) tax += discounted * 0.18;
 
     setTaxAmount(tax);
     setTotalAmount(discounted + tax);
-  }, [subtotal, discountType, discountValue, taxEnabled]);
+  }, [subtotal, discountType, discountValue, taxSettings]);
 
   useEffect(() => {
     axios.get(`${API}/business`).then((res) => {
       setBusinesses(res.data);
+    });
+    axios.get(`${API}/pricing-plan`).then((res) => {
+      setPlans(res.data);
     });
   }, []);
 
@@ -92,25 +104,34 @@ export default function CreateInvoice() {
     const selectedBusiness = businesses.find((b) => b.name === business);
     const selectedBrand = selectedBusiness?.brands.find((br: any) => br.name === brand);
     const selectedStore = selectedBrand?.restaurants.find((st: any) => st.name === name);
-    setPlan(selectedStore?.restaurantPricingPlans[0].pricingPlan ?? {});
+    if (selectedStore) setStoreId(selectedStore?.id);
   }
 
-  // useEffect(() => {
-  //   if (business && businesses && brands) {
-  //     console.log({ businesses });
-  //     console.log({ business });
-  //     console.log({ brands });
-  //     console.log({ stores });
-  //     console.log({ plan });
-  //   }
-  // }, [business, brand]);
+  async function handleCreateInvoice() {
+    const payload = {
+      restaurantId: Number(storeId),
+      pricingPlanId: Number(planId),
+      ...taxSettings,
+      planMode: "live",
+      customDuration: Number(duration),
+      displayDate,
+      subTotal: Number(subtotal),
+      totalAmount: Number(totalAmount),
+    };
+  
+    console.log("Creating Invoice with Payload:", payload);
+  
+    try {
+      await axios.post(`${API}/restaurant/create-invoice`, payload);
+      alert("Invoice created successfully!");
+    } catch (err) {
+      console.error("Error creating invoice:", err);
+    }
+  }
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">ADD / UPDATE INVOICE</h1>
-        <span className="text-gray-400 cursor-pointer hover:text-black">Manage Invoices</span>
-      </div>
+      <h1 className="text-2xl font-bold mb-5">CREATE INVOICE</h1>
 
       <div className="space-y-6">
 
@@ -160,41 +181,19 @@ export default function CreateInvoice() {
             </select>
           </div>
 
-          {/* <div>
+          <div>
             <label className="text-sm font-semibold">Choose Plan</label>
             <select
               className="w-full border rounded-md p-2 mt-1"
-              value={plan}
-              onChange={(e) => setPlan(e.target.value)}
+              value={planId || ""}
+              onChange={(e) => setPlanId(Number(e.target.value))}
             >
               <option value="">Choose Plan</option>
-              {plan.map((p) => (
-                <option key={p} value={p}>{p}</option>
+              {plans.map((p) => (
+                <option key={p.id} value={p.id}>{p.planName}</option>
               ))}
             </select>
-          </div> */}
-        </div>
-
-        {/* Invoice No */}
-        <div>
-          <label className="text-sm font-semibold">Invoice No #</label>
-          <input
-            type="text"
-            className="w-full border rounded-md p-2 mt-1"
-            value={invoiceNo}
-            onChange={(e) => setInvoiceNo(e.target.value)}
-          />
-        </div>
-
-        {/* Invoice Date */}
-        <div>
-          <label className="text-sm font-semibold">Invoice Date</label>
-          <input
-            type="date"
-            className="w-full border rounded-md p-2 mt-1"
-            value={invoiceDate}
-            onChange={(e) => setInvoiceDate(e.target.value)}
-          />
+          </div>
         </div>
 
         {/* Display Date */}
@@ -202,6 +201,7 @@ export default function CreateInvoice() {
           <label className="text-sm font-semibold">Display Date (Optional)</label>
           <input
             type="date"
+            onClick={(e) => (e.target as HTMLInputElement).showPicker()}
             className="w-full border rounded-md p-2 mt-1"
             value={displayDate}
             onChange={(e) => setDisplayDate(e.target.value)}
@@ -216,10 +216,18 @@ export default function CreateInvoice() {
             value={duration}
             onChange={(e) => setDuration(e.target.value)}
           >
-            <option>1 Month</option>
-            <option>3 Months</option>
-            <option>6 Months</option>
-            <option>12 Months</option>
+            <option value={1}>1 Month</option>
+            <option value={2}>2 Months</option>
+            <option value={3}>3 Months</option>
+            <option value={4}>4 Months</option>
+            <option value={5}>5 Months</option>
+            <option value={6}>6 Months</option>
+            <option value={7}>7 Months</option>
+            <option value={8}>8 Months</option>
+            <option value={9}>9 Months</option>
+            <option value={10}>10 Months</option>
+            <option value={11}>11 Months</option>
+            <option value={12}>12 Months</option>
           </select>
         </div>
 
@@ -256,23 +264,55 @@ export default function CreateInvoice() {
           </div>
         </div>
 
-        {/* Tax */}
-        <div className="flex items-center gap-3">
-          <label className="font-semibold">Taxes (18%)</label>
+        {/* TAX SETTINGS */}
+        <div className="border rounded-lg p-2 bg-gray-50">
+          <div className="bg-gray-100 p-4 rounded space-y-3">
+            <h3 className="text-md font-semibold text-gray-800">GST Settings</h3>
 
-          <input
-            type="checkbox"
-            checked={taxEnabled}
-            onChange={() => setTaxEnabled(!taxEnabled)}
-            className="w-5 h-5"
-          />
+            <div className="flex flex-col gap-2 text-sm">
 
-          <input
-            disabled
-            type="number"
-            value={taxAmount.toFixed(2)}
-            className="border rounded-md p-2 w-24 bg-gray-100"
-          />
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4"
+                  checked={taxSettings.CGST}
+                  onChange={(e) => setTaxSettings(prev => ({ ...prev, CGST: e.target.checked }))}
+                />
+                <span>CGST 9%</span>
+              </label>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4"
+                  checked={taxSettings.SGST}
+                  onChange={(e) => setTaxSettings(prev => ({ ...prev, SGST: e.target.checked }))}
+                />
+                <span>SGST 9%</span>
+              </label>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4"
+                  checked={taxSettings.IGST}
+                  onChange={(e) => setTaxSettings(prev => ({ ...prev, IGST: e.target.checked }))}
+                />
+                <span>IGST 18%</span>
+              </label>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4"
+                  checked={taxSettings.LUT}
+                  onChange={(e) => setTaxSettings(prev => ({ ...prev, LUT: e.target.checked }))}
+                />
+                <span>Add LUT</span>
+              </label>
+
+            </div>
+          </div>
         </div>
 
         {/* Total */}
@@ -289,9 +329,10 @@ export default function CreateInvoice() {
         {/* Submit */}
 
         <button
+          onClick={() => handleCreateInvoice()}
           className="w-full bg-black text-white py-2 rounded-md text-lg font-semibold hover:bg-gray-800"
         >
-          Save Invoice
+          Create Invoice
         </button>
 
       </div>
