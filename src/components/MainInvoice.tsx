@@ -373,7 +373,7 @@ export default function ProformaInvoice() {
                 Remaining Amount Due
               </td>
               <td className="border p-2 text-center text-red-700">
-                {Math.max(invoice.remainingAmount, 0)}.00/-
+                {Number(Math.ceil(Math.max(invoice.remainingAmount, 0)))}.00/-
               </td>
             </tr>
           )}

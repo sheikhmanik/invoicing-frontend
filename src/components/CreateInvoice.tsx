@@ -22,7 +22,7 @@ export default function CreateInvoice() {
 
   const [displayDate, setDisplayDate] = useState("");
 
-  const [duration, setDuration] = useState("1 Month");
+  const [duration, setDuration] = useState<number>(1);
   const [subtotal, setSubtotal] = useState(0);
 
   const [discountType, setDiscountType] = useState<"percent" | "fixed">("percent");
@@ -69,6 +69,60 @@ export default function CreateInvoice() {
     });
   }, []);
 
+  useEffect(() => {
+    if (!planId) {
+      setSubtotal(0);
+      return;
+    }
+    const selectedPlan = plans.find((p) => p.id === planId);
+    if (selectedPlan) {
+      // setSubtotal(selectedPlan.planType === "fixed" ? selectedPlan.fixedPrice : selectedPlan.basePrice);
+      const price = selectedPlan.planType === "fixed" ? Number(selectedPlan.fixedPrice) : Number(selectedPlan.basePrice);
+      const validity = selectedPlan.planType === "fixed" ? Number(selectedPlan.billingCycle) : Number(selectedPlan.validity);
+      if (!price || !validity) {
+        setSubtotal(0);
+        console.log("Invalid price or validity");
+        return;
+      }
+      const perMonthPrice = Number(price) / Number(validity);
+      const sub = Number(perMonthPrice * duration);
+      setSubtotal(Math.ceil(sub));
+    }
+  }, [planId]);
+
+  useEffect(() => {
+    if (!duration || !planId) {
+      setSubtotal(0);
+      return;
+    };
+    const selectedPlan = plans.find((p) => p.id === planId);
+    if (selectedPlan) {
+      const price = selectedPlan.planType === "fixed" ? Number(selectedPlan.fixedPrice) : Number(selectedPlan.basePrice);
+      const validity = selectedPlan.planType === "fixed" ? Number(selectedPlan.billingCycle) : Number(selectedPlan.validity);
+      if (!price || !validity) {
+        setSubtotal(0);
+        console.log("Invalid price or validity");
+        return;
+      }
+      const perMonthPrice = Number(price) / Number(validity);
+      const sub = Number(perMonthPrice * duration);
+      setSubtotal(Math.ceil(sub));
+    }
+  }, [duration, planId]);
+
+  useEffect(() => {
+    const selectedStore = stores.find((s) => s.name === store);
+    if (selectedStore) {
+      const taxes = selectedStore?.restaurantPricingPlans[0];
+      setTaxSettings({
+        CGST: taxes?.cgst || false,
+        SGST: taxes?.sgst || false,
+        IGST: taxes?.igst || false,
+        LUT: taxes?.lut || false,
+      });
+    };
+  }, [brand, store]);
+
   function handleBusiness(name: string) {
     setBusiness(name);
   
@@ -77,7 +131,7 @@ export default function CreateInvoice() {
       setBrand("");
       setStores([]);
       setStore("");
-      setPlan([]);
+      setPlan("");
       setPlan("");
       return;
     }
@@ -88,7 +142,7 @@ export default function CreateInvoice() {
     setBrand("");
     setStores([]);
     setStore("");
-    setPlan([]);
+    setPlan("");
     setPlan("");
   }
 
@@ -154,6 +208,24 @@ export default function CreateInvoice() {
       await axios.post(`${API}/restaurant/create-invoice`, payload);
       setError("");
       alert("Invoice created successfully!");
+      window.scrollTo(0, 0);
+      
+      // clear the whole form
+      setBusiness("");
+      setBrand("");
+      setStore("");
+      setPlanId(null);
+      setDisplayDate("");
+      setDuration(1);
+      setSubtotal(0);
+      setDiscountType("percent");
+      setDiscountValue(0);
+      setTaxSettings({
+        CGST: false,
+        SGST: false,
+        IGST: false,
+        LUT: false,
+      });
     } catch (err) {
       console.error("Error creating invoice:", err);
     }
@@ -171,7 +243,7 @@ export default function CreateInvoice() {
           </div>
         )}
 
-        {/* Company */}
+        {/* Business */}
         <div>
           <label className="text-sm font-semibold">Choose Business</label>
           <select
@@ -237,6 +309,7 @@ export default function CreateInvoice() {
           <label className="text-sm font-semibold">Display Date (Optional)</label>
           <input
             type="date"
+            max={new Date().toISOString().split("T")[0]} // ⛔ prevents future calendar selection
             onClick={(e) => (e.target as HTMLInputElement).showPicker()}
             className="w-full border rounded-md p-2 mt-1"
             value={displayDate}
@@ -271,10 +344,10 @@ export default function CreateInvoice() {
         <div>
           <label className="text-sm font-semibold">Subtotal Amount</label>
           <input
+            disabled
             type="number"
             className="w-full border rounded-md p-2 mt-1"
-            value={subtotal}
-            onChange={(e) => setSubtotal(Number(e.target.value))}
+            value={Number(subtotal)}
           />
         </div>
 

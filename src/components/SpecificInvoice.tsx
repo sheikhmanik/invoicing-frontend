@@ -387,7 +387,7 @@ export default function SpecificInvoice() {
                   Remaining Amount Due
                 </td>
                 <td className="border p-2 text-center text-red-700">
-                  {Math.max(remaining, 0)}.00/-
+                  {Number(Math.ceil(Math.max(remaining, 0)))}.00/-
                 </td>
               </tr>
             );
