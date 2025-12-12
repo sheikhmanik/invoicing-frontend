@@ -37,7 +37,7 @@ export default function CreateInvoice() {
   });
 
   const [totalAmount, setTotalAmount] = useState(0);
-  const [erros, setErrors] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let discounted = subtotal;
@@ -108,6 +108,37 @@ export default function CreateInvoice() {
   }
 
   async function handleCreateInvoice() {
+    
+    if (!business) {
+      setError("Please select a Business.");
+      return;
+    }
+
+    if (!brand) {
+      setError("Please select a Brand.");
+      return;
+    }
+
+    if (!storeId) {
+      setError("Please select a Store.");
+      return;
+    }
+  
+    if (!planId) {
+      setError("Please select a Pricing Plan.");
+      return;
+    }
+  
+    if (!duration || Number(duration) <= 0) {
+      setError("Please select a valid invoice duration.");
+      return;
+    }
+  
+    if (!subtotal || Number(subtotal) <= 0) {
+      setError("Please enter a valid Subtotal Amount.");
+      return;
+    }
+
     const payload = {
       restaurantId: Number(storeId),
       pricingPlanId: Number(planId),
@@ -119,10 +150,9 @@ export default function CreateInvoice() {
       totalAmount: Number(totalAmount),
     };
   
-    console.log("Creating Invoice with Payload:", payload);
-  
     try {
       await axios.post(`${API}/restaurant/create-invoice`, payload);
+      setError("");
       alert("Invoice created successfully!");
     } catch (err) {
       console.error("Error creating invoice:", err);
@@ -134,6 +164,12 @@ export default function CreateInvoice() {
       <h1 className="text-2xl font-bold mb-5">CREATE INVOICE</h1>
 
       <div className="space-y-6">
+
+        {error && (
+          <div className="bg-red-100 text-red-700 p-3 rounded-md">
+            {error}
+          </div>
+        )}
 
         {/* Company */}
         <div>
