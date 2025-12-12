@@ -10,13 +10,10 @@ import AddProduct from "./AddProduct";
 import axios from "axios";
 import CustomerWizard from "./create-customer/wizard/CustomerWizard";
 import PlanListing from "./PlanListing";
-import PaidInvoices from "./invoice-list/PaidInvoices";
-import UnpaidInvoices from "./invoice-list/UnpaidInvoices";
 import InvoiceList from "./InvoiceList";
 import CreateInvoice from "./CreateInvoice";
 
 export default function Dashboard() {
-
   const [display, setDisplay] = useState<string>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("dashboardView");
@@ -28,25 +25,111 @@ export default function Dashboard() {
   });
   const [stats, setStats] = useState<any>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [paidInvoices, setPaidInvoices] = useState<any[]>([]);
+  const [unpaidInvoices, setUnpaidInvoices] = useState<any[]>([]);
+  const [fromDate, setFromDate] = useState<string>("");
+  const [toDate, setToDate] = useState<string>("");
 
   const statsTop = [
-    { title: "Total Customers", value: stats?.totalCustomers ?? "—" },
-    { title: "Total Outlets", value: "3,900" },
-    { title: "Pending Invoices", value: "2,000" },
-    { title: "Paid Invoices", value: "1,800" },
+    { title: "Total Businesses", value: stats?.totalBusinesses?.length ?? "—" },
+    { title: "Total Outlets", value: stats?.totalRestaurants?.length ?? "—" },
+    { title: "Pending Invoices", value: unpaidInvoices?.length ?? "—" },
+    { title: "Paid Invoices", value: paidInvoices?.length ?? "—" },
   ];
 
-  const statsBottom = [
-    { title: "MRR", value: "40,00,000" },
-    { title: "ARR", value: "36,00,000" },
-    { title: "New Customers", value: "140" },
-    { title: "Churn (outlets)", value: "50" },
-  ];
+  function groupInvoicesByProforma(allInvoices: any[]) {
+    const groups: Record<string, any[]> = {};
+
+    for (const invoice of allInvoices) {
+      const key = invoice.proformaNumber as string;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(invoice);
+    }
+    return groups;
+  };
+
+  function paidInvs(groups: Record<string, any[]>) {
+    return Object.values(groups)
+      .map((invoice) =>
+        invoice.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+      )
+      .filter((inv) => inv.status === "paid" || inv.status === "partially paid"
+    );
+  };
+
+  function unpaidInvs(groups: Record<string, any[]>) {
+    return Object.values(groups)
+      .map((invoice) =>
+        invoice.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+      )
+      .filter((inv) => inv.status === "pending" || inv.status === "partially paid");
+  };
+
+  function applyDateFilter() {
+    if (!fromDate && !toDate) return;
+  
+    // Normalize bounds (start of fromDate, end of toDate) so "to" is inclusive
+    const from = fromDate ? new Date(fromDate) : null;
+    if (from) { from.setHours(0,0,0,0); }
+    const to = toDate ? new Date(toDate) : null;
+    if (to) { to.setHours(23,59,59,999); }
+
+    const filteredInvoices = stats?.invoices?.filter((inv: any) => {
+      const createdAt = new Date(inv.createdAt);
+      if (from && to) {
+        return createdAt >= from && createdAt <= to;
+      } else if (from) {
+        return createdAt >= from;
+      } else if (to) {
+        return createdAt <= to;
+      }
+      return true;
+    }) ?? [];
+    const groupedInvoices = groupInvoicesByProforma(filteredInvoices);
+    const paid = paidInvs(groupedInvoices);
+    const unpaid = unpaidInvs(groupedInvoices);
+    if (paid) setPaidInvoices(paid);
+    if (unpaid) setUnpaidInvoices(unpaid);
+
+    // Let's do the same for businesses and restaurants
+    const filteredBusinesses = stats?.totalBusinesses?.filter((biz: any) => {
+      const createdAt = new Date(biz.createdAt);
+      if (from && to) {
+        return createdAt >= from && createdAt <= to;
+      } else if (from) {
+        return createdAt >= from;
+      } else if (to) {
+        return createdAt <= to;
+      }
+      return true;
+    }) ?? [];
+    const filteredRestaurants = stats?.totalRestaurants?.filter((rest: any) => {
+      const createdAt = new Date(rest.createdAt);
+      if (from && to) {
+        return createdAt >= from && createdAt <= to;
+      } else if (from) {
+        return createdAt >= from;
+      } else if (to) {
+        return createdAt <= to;
+      }
+      return true;
+    }) ?? [];
+    setStats({
+      ...stats,
+      totalBusinesses: filteredBusinesses,
+      totalRestaurants: filteredRestaurants,
+    });
+  };
 
   useEffect(() => {
     const URL = process.env.NEXT_PUBLIC_API_URL;
     axios.get(`${URL}/dashboard/stats`).then(res => {
       setStats(res.data);
+      const groupedInvoices = groupInvoicesByProforma(res.data?.invoices ?? []);
+      const paid = paidInvs(groupedInvoices);
+      const unpaid = unpaidInvs(groupedInvoices);
+      if (paid) setPaidInvoices(paid);
+      if (unpaid) setUnpaidInvoices(unpaid);
     });
   }, []);
 
@@ -67,7 +150,7 @@ export default function Dashboard() {
 
   if (!hydrated) {
     return null;
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 text-slate-800">
@@ -106,16 +189,25 @@ export default function Dashboard() {
                   <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
                     <input
                       type="date"
+                      onClick={(e) => (e.target as HTMLInputElement).showPicker()}
+                      max={new Date().toISOString().split("T")[0]}
+                      onChange={(e) => setFromDate(e.target.value)}
                       className="px-3 py-2 border rounded-md bg-white text-sm flex-1 sm:flex-none w-full sm:w-auto focus:ring-2 focus:ring-sky-400 outline-none"
                     />
                     <span className="text-sm text-gray-400">to</span>
                     <input
                       type="date"
+                      onClick={(e) => (e.target as HTMLInputElement).showPicker()}
+                      max={new Date().toISOString().split("T")[0]}
+                      onChange={(e) => setToDate(e.target.value)}
                       className="px-3 py-2 border rounded-md bg-white text-sm flex-1 sm:flex-none w-full sm:w-auto focus:ring-2 focus:ring-sky-400 outline-none"
                     />
                   </div>
 
-                  <button className="bg-sky-600 text-white px-4 py-2 text-sm rounded-md shadow hover:bg-sky-700 transition w-full sm:w-auto">
+                  <button
+                    onClick={applyDateFilter}
+                    className="bg-sky-600 text-white px-4 py-2 text-sm rounded-md shadow hover:bg-sky-700 transition w-full sm:w-auto"
+                  >
                     Apply
                   </button>
                 </div>
@@ -134,33 +226,24 @@ export default function Dashboard() {
                 ))}
               </section>
 
-              {/* BOTTOM CARDS */}
-              <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                {statsBottom.map((s) => (
-                  <div
-                    key={s.title}
-                    className="bg-white border rounded-lg p-5 shadow-md hover:shadow-lg transition"
-                  >
-                    <div className="text-sm font-medium text-gray-500">{s.title}</div>
-                    <div className="mt-3 text-3xl font-bold text-gray-800">{s.value}</div>
-                  </div>
-                ))}
-              </section>
-
               {/* THREE-COLUMN BLOCK */}
-              <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <section className="grid grid-cols-1 gap-4">
 
-                <div className="bg-white border rounded-lg p-6 shadow-md hover:shadow-lg transition">
+                {/* <div className="bg-white border rounded-lg p-6 shadow-md hover:shadow-lg transition">
                   <div className="text-sm text-gray-500 font-medium">MRR</div>
-                  <div className="mt-4 text-4xl font-bold text-gray-800">40,00,000</div>
+                  <div className="mt-4 text-4xl font-bold text-gray-800">
+                    {}
+                  </div>
                   <div className="mt-2 text-xs text-gray-500">Monthly recurring revenue</div>
                 </div>
 
                 <div className="bg-white border rounded-lg p-6 shadow-md hover:shadow-lg transition">
                   <div className="text-sm text-gray-500 font-medium">ARR</div>
-                  <div className="mt-4 text-4xl font-bold text-gray-800">36,00,000</div>
+                  <div className="mt-4 text-4xl font-bold text-gray-800">
+                    {}
+                  </div>
                   <div className="mt-2 text-xs text-gray-500">Annual recurring revenue</div>
-                </div>
+                </div> */}
 
                 <div className="bg-white border rounded-lg p-6 shadow-md hover:shadow-lg transition">
                   <div className="text-sm text-gray-500 font-medium">Overview</div>
@@ -168,15 +251,27 @@ export default function Dashboard() {
                   <div className="mt-4 flex flex-col gap-3">
                     <div className="flex justify-between text-sm">
                       <span>Pending invoices</span>
-                      <span className="font-semibold">2,000</span>
+                      <span className="font-semibold">
+                        {unpaidInvoices?.length ?? "—"}
+                      </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span>Paid invoices</span>
-                      <span className="font-semibold">1,800</span>
+                      <span className="font-semibold">
+                        {paidInvoices?.length ?? "—"}
+                      </span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span>New customers</span>
-                      <span className="font-semibold">140</span>
+                      <span>Total Business</span>
+                      <span className="font-semibold">
+                        {stats?.totalBusinesses?.length ?? "—"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Total Outlets</span>
+                      <span className="font-semibold">
+                        {stats?.totalRestaurants?.length ?? "—"}
+                      </span>
                     </div>
                   </div>
                 </div>
