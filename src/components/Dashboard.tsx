@@ -13,6 +13,8 @@ import PlanListing from "./PlanListing";
 import InvoiceList from "./InvoiceList";
 import CreateInvoice from "./CreateInvoice";
 
+const API = process.env.NEXT_PUBLIC_API_URL;
+
 export default function Dashboard() {
   const [display, setDisplay] = useState<string>(() => {
     if (typeof window !== "undefined") {
@@ -115,8 +117,7 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
-    const URL = process.env.NEXT_PUBLIC_API_URL;
-    axios.get(`${URL}/dashboard/stats`).then(res => {
+    axios.get(`${API}/dashboard/stats`).then(res => {
       setStats(res.data);
       const groupedInvoices = groupInvoicesByProforma(res.data?.invoices ?? []);
       const paid = paidInvs(groupedInvoices);
@@ -124,6 +125,12 @@ export default function Dashboard() {
       if (paid) setPaidInvoices(paid);
       if (unpaid) setUnpaidInvoices(unpaid);
     });
+  }, []);
+
+  useEffect(() => {
+    axios.post(`${API}/auto-generate`).then(res => {
+      console.log(res.data);
+    })
   }, []);
 
   useEffect(() => {

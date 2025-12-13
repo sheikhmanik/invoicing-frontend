@@ -73,6 +73,22 @@ interface Restaurant {
   invoices: any[];
 }
 
+interface Invoice {
+  id: string;
+  createdAt: string;
+  proformaNumber: string;
+  invoiceNumber: string;
+  totalAmount: number;
+  dueDate: string;
+  status: string;
+  pricingPlan: {
+    planName: string;
+  };
+  paidAmount: number;
+  remainingAmount: number;
+  restaurant: Restaurant;
+}
+
 const API = process.env.NEXT_PUBLIC_API_URL;
 
 export default function Customers() {
@@ -80,6 +96,7 @@ export default function Customers() {
   const [restaurants, setRestaurants] = useState([]);
   const [currentResId, serCurrentResId] = useState<number | null>(null);
   const [currentRestaurant, setCurrentRestaurant] = useState<Restaurant[]>([]);
+  const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
   const [allPlans, setAllPlans] = useState<PricingPlan[]>([]);
   const [planEditingModal, setPlanEditingModal] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState<null | Record<any, any>>(null);
@@ -178,6 +195,7 @@ export default function Customers() {
     if (!planMode) return alert("Please include plan mode.");
     if (planMode === "trial" && !trialDays) return alert("Please include trial days.");
     if (!currentPlan) return alert("No plan assigned on this business.");
+    if (!currentInvoice) return alert("No current invoice found.");
     setUpdatingTaxSettings(true);
     const payload = {
       restaurantId,
@@ -186,11 +204,13 @@ export default function Customers() {
       startDate,
       planMode,
       trialDays,
+      proformaNumber: currentInvoice.proformaNumber,
     };
     try {
       await axios.post(`${API}/restaurant/update-tax-settings`, payload);
       alert("Tax settings applied successfully.");
       setPlanEditingModal(false);
+      setCurrentInvoice(null);
       window.location.reload();
     } catch (err) {
       console.error(err);
@@ -206,6 +226,10 @@ export default function Customers() {
     }
     if (!paymentFile) {
       setError("Payment file is required!");
+      return;
+    }
+    if (!currentInvoice) {
+      setError("No current invoice found!");
       return;
     }
 
@@ -233,13 +257,15 @@ export default function Customers() {
         paymentNotes,
         isPartial,
         partialAmount: isPartial === "Yes" ? partialAmount : null,
-        paymentFileUrl: uploadedUrl
+        paymentFileUrl: uploadedUrl,
+        proformaNumber: currentInvoice.proformaNumber,
       };
       await axios.post(`${API}/restaurant/update-payment`, payload);
   
       alert("Payment updated successfully!");
       setUpdatePayment(false);
       serCurrentResId(null);
+      setCurrentInvoice(null);
       window.location.reload();
 
     } catch (err) {
@@ -415,6 +441,7 @@ export default function Customers() {
                               onClick={() => {
                                 selectRestaurant(r.id);
                                 setPlanEditingModal(true);
+                                setCurrentInvoice(r.invoices?.at(-1))
                               }}
                               className="block w-full text-xs py-1.5 border border-gray-300 rounded-md bg-gray-50 hover:bg-gray-100 cursor-pointer"
                             >
@@ -489,6 +516,7 @@ export default function Customers() {
                                     onClick={() => {
                                       serCurrentResId(r.id)
                                       setUpdatePayment(true)
+                                      setCurrentInvoice(r.invoices?.at(-1))
                                     }}
                                     className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
                                   >
@@ -675,6 +703,7 @@ export default function Customers() {
                               onClick={() => {
                                 selectRestaurant(r.id);
                                 setPlanEditingModal(true);
+                                setCurrentInvoice(r.invoices?.at(-1))
                               }}
                               className="block w-full text-xs py-1.5 border border-gray-300 rounded-md bg-gray-50 hover:bg-gray-100 cursor-pointer"
                             >
@@ -748,6 +777,7 @@ export default function Customers() {
                                 onClick={() => {
                                   serCurrentResId(r.id)
                                   setUpdatePayment(true)
+                                  setCurrentInvoice(r.invoices?.at(-1))
                                 }}
                                 className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
                               >
@@ -919,6 +949,7 @@ export default function Customers() {
                               onClick={() => {
                                 selectRestaurant(r.id);
                                 setPlanEditingModal(true);
+                                setCurrentInvoice(r.invoices.at(-1))
                               }}
                               className="block w-full text-xs py-1.5 border border-gray-300 rounded-md bg-gray-50 hover:bg-gray-100 cursor-pointer"
                             >
@@ -991,6 +1022,7 @@ export default function Customers() {
                               onClick={() => {
                                 serCurrentResId(r.id)
                                 setUpdatePayment(true)
+                                setCurrentInvoice(r.invoices?.at(-1))
                               }}
                               className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
                             >

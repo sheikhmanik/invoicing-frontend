@@ -79,6 +79,10 @@ export default function UnpaidInvoices({ allInvoices, latestUnpaidInvoices }: Pr
       setError("Payment file is required!");
       return;
     }
+    if (!currentInvoice) {
+      setError("Current Invoice is null.");
+      return;
+    }
 
     setUpdatingPayment(true);
   
@@ -104,13 +108,15 @@ export default function UnpaidInvoices({ allInvoices, latestUnpaidInvoices }: Pr
         paymentNotes,
         isPartial,
         partialAmount: isPartial === "Yes" ? partialAmount : null,
-        paymentFileUrl: uploadedUrl
+        paymentFileUrl: uploadedUrl,
+        proformaNumber: currentInvoice.proformaNumber,
       };
       await axios.post(`${API}/restaurant/update-payment`, payload);
   
       alert("Payment updated successfully!");
       setUpdatePayment(false);
       setCurrentRestaurant(null)
+      setCurrentInvoice(null);
       window.location.reload();
 
     } catch (err) {
@@ -178,7 +184,6 @@ export default function UnpaidInvoices({ allInvoices, latestUnpaidInvoices }: Pr
 
   const proformaGroups = groupInvoicesByProforma(allInvoices);
   const latestUnpaidInvs = getLatestUnpaidInvoices(proformaGroups);
-  console.log(latestUnpaidInvoices)
 
   const paymentHistoryMap = new Map(
     latestUnpaidInvs.map((latestInv) => {
