@@ -2,7 +2,7 @@
 
 import axios from "axios";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 interface Restaurant {
   id: string;
@@ -178,6 +178,7 @@ export default function UnpaidInvoices({ allInvoices, latestUnpaidInvoices }: Pr
 
   const proformaGroups = groupInvoicesByProforma(allInvoices);
   const latestUnpaidInvs = getLatestUnpaidInvoices(proformaGroups);
+  console.log(latestUnpaidInvoices)
 
   const paymentHistoryMap = new Map(
     latestUnpaidInvs.map((latestInv) => {

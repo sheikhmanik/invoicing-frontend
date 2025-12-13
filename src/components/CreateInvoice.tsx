@@ -15,6 +15,7 @@ export default function CreateInvoice() {
 
   const [brand, setBrand] = useState("");
   const [store, setStore] = useState("");
+  const [storeDetails, setStoreDetails] = useState<Record<string, any> | null>(null);
   const [plan, setPlan] = useState("");
 
   const [storeId, setStoreId] = useState<number | null>(null);
@@ -27,6 +28,7 @@ export default function CreateInvoice() {
 
   const [discountType, setDiscountType] = useState<"percent" | "fixed">("percent");
   const [discountValue, setDiscountValue] = useState(0);
+  const [discountAmount, setDiscountAmount] = useState<number | null>(null);
 
   const [taxAmount, setTaxAmount] = useState(0);
   const [taxSettings, setTaxSettings] = useState({
@@ -40,24 +42,27 @@ export default function CreateInvoice() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    let discounted = subtotal;
+    let discounted;
 
     // Apply discount
     if (discountType === "percent") {
-      discounted -= (subtotal * discountValue) / 100;
+      // discounted -= (subtotal * discountValue) / 100;
+      discounted = ( subtotal / 100 ) * discountValue
     } else {
-      discounted -= discountValue;
+      discounted = discountValue;
     }
 
     let tax = 0;
 
     // 🔥 Independent tax calculations
-    if (taxSettings.CGST) tax += discounted * 0.09;
-    if (taxSettings.SGST) tax += discounted * 0.09;
-    if (taxSettings.IGST) tax += discounted * 0.18;
+    const cgstAmount = taxSettings.CGST ? subtotal * 0.09 : 0;
+    const sgstAmount = taxSettings.SGST ? subtotal * 0.09 : 0;
+    const igstAmount = taxSettings.IGST ? subtotal * 0.18 : 0;
+    tax = cgstAmount + sgstAmount + igstAmount
 
     setTaxAmount(tax);
-    setTotalAmount(discounted + tax);
+    setTotalAmount((subtotal + tax) - discounted);
+    setDiscountAmount(Math.ceil(discounted));
   }, [subtotal, discountType, discountValue, taxSettings]);
 
   useEffect(() => {
@@ -133,6 +138,7 @@ export default function CreateInvoice() {
       setStore("");
       setPlan("");
       setPlan("");
+      setStoreDetails(null);
       return;
     }
   
@@ -144,6 +150,7 @@ export default function CreateInvoice() {
     setStore("");
     setPlan("");
     setPlan("");
+    setStoreDetails(null);
   }
 
   function handleBrand(name: string) {
@@ -158,7 +165,10 @@ export default function CreateInvoice() {
     const selectedBusiness = businesses.find((b) => b.name === business);
     const selectedBrand = selectedBusiness?.brands.find((br: any) => br.name === brand);
     const selectedStore = selectedBrand?.restaurants.find((st: any) => st.name === name);
-    if (selectedStore) setStoreId(selectedStore?.id);
+    if (selectedStore) {
+      setStoreId(selectedStore.id)
+      setStoreDetails(selectedStore || {});
+    };
   }
 
   async function handleCreateInvoice() {
@@ -202,9 +212,11 @@ export default function CreateInvoice() {
       displayDate,
       subTotal: Number(subtotal),
       totalAmount: Number(totalAmount),
+      discountAmount,
     };
   
     try {
+      // console.log(payload); return;
       await axios.post(`${API}/restaurant/create-invoice`, payload);
       setError("");
       alert("Invoice created successfully!");
@@ -276,17 +288,20 @@ export default function CreateInvoice() {
         {/* Store + Plan */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-sm font-semibold">Choose Store</label>
-            <select
-              className="w-full border rounded-md p-2 mt-1"
-              value={store}
-              onChange={(e) => handleStore(e.target.value as string)}
-            >
-              <option value="">Choose Store</option>
-              {stores.map((s) => (
-                <option key={s.id} value={s.name}>{s.name}</option>
-              ))}
-            </select>
+            <div>
+              <label className="text-sm font-semibold">Choose Store</label>
+              <select
+                className="w-full border rounded-md p-2 mt-1"
+                value={store}
+                onChange={(e) => handleStore(e.target.value as string)}
+              >
+                <option value="">Choose Store</option>
+                {stores.map((s) => (
+                  <option key={s.id} value={s.name}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+            {storeDetails && <span className="text-sm pl-1">Location: {storeDetails?.location}</span>}
           </div>
 
           <div>

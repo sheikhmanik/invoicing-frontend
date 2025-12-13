@@ -67,9 +67,12 @@ function numberToWords(num: number): string {
 
 interface PricingPlan {
   createdAt: string;
+  planType: "fixed" | "metered" | "hybrid";
+  billingCycle: number;
   validity: number;
   basePrice: number;
   planName: string;
+  customDuration: number;
 }
 
 interface Invoice {
@@ -81,6 +84,7 @@ interface Invoice {
   remainingAmount: number;
   status: "pending" | "paid";
   paymentDate: string;
+  discountAmount?: number;
 }
 
 interface RestaurantBrand {
@@ -94,8 +98,10 @@ interface RestaurantBrand {
 interface Restaurant {
   name: string;
   invoices: Invoice[];
-  restaurantPricingPlans: { 
+  restaurantPricingPlans: {
+    createdAt: string;
     pricingPlan: PricingPlan,
+    customDuration: number,
     cgst: boolean,
     igst: boolean,
     sgst: boolean,
@@ -140,14 +146,28 @@ export default function ProformaInvoice() {
 
   const invoice = restaurant.invoices.at(-1) || null;
   const pricingPlan = restaurant.restaurantPricingPlans[0]?.pricingPlan || null;
+  const restaurantPricingPlan = restaurant.restaurantPricingPlans[0] || null;
 
   if (!invoice || !pricingPlan || !restaurant)
     return <div className="text-center text-red-600 mt-10">Invoice data not found</div>
   ;
 
-  const createdDate = new Date(pricingPlan.createdAt);
+  const createdDate = new Date(restaurantPricingPlan.createdAt);
   const endDate = new Date(createdDate);
-  endDate.setMonth(endDate.getMonth() + (pricingPlan.validity - 1));
+
+  if (pricingPlan.planType === "fixed") {
+    if (restaurantPricingPlan?.customDuration && restaurantPricingPlan.customDuration > 0) {
+      endDate.setMonth(endDate.getMonth() + restaurantPricingPlan.customDuration - 1);
+    } else {
+      endDate.setMonth(endDate.getMonth() + pricingPlan.validity - 1);
+    }
+  } else {
+    if (restaurantPricingPlan?.customDuration && restaurantPricingPlan.customDuration > 0) {
+      endDate.setMonth(endDate.getMonth() + restaurantPricingPlan.customDuration - 1);
+    } else {
+      endDate.setMonth(endDate.getMonth() + pricingPlan.validity - 1);
+    }
+  }
 
   const formatDate = (date: Date) =>
     date.toLocaleDateString("en-GB", {
@@ -272,7 +292,7 @@ export default function ProformaInvoice() {
             <td className="border p-2">Possier Point of Sale</td>
             <td className="border p-2 whitespace-pre-line">
               {restaurant.name}{"\n"}
-              {pricingPlan.validity} month(s) Subscription{"\n"}
+              {restaurantPricingPlan.customDuration || pricingPlan.customDuration} month(s) Subscription{"\n"}
               Subscription period:{"\n"}
               {subscriptionPeriod}
             </td>
@@ -307,6 +327,17 @@ export default function ProformaInvoice() {
               <td className="border p-2 text-center">{Number(subTotalAmount * 0.18)}.00/-</td>
             </tr>
           )}
+
+          {invoice.discountAmount && (invoice.discountAmount > 0) ? (
+            <tr className="bg-yellow-50">
+              <td colSpan={3} className="border p-2 text-right text-yellow-800">
+                Discount Applied
+              </td>
+              <td className="border p-2 text-center text-yellow-800">
+                -{invoice.discountAmount}.00/-
+              </td>
+            </tr>
+          ) : null}
 
           <tr className="font-bold">
             <td colSpan={3} className="border p-2 text-right">

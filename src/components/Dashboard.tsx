@@ -29,12 +29,15 @@ export default function Dashboard() {
   const [unpaidInvoices, setUnpaidInvoices] = useState<any[]>([]);
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
+  const [filteredBusinesses, setFilteredBusinesses] = useState<any[]>([]);
+  const [filteredRestaurants, setFilteredRestaurants] = useState<any[]>([]);
+  const [dateWise, setDateWise] = useState<boolean>(false);
 
   const statsTop = [
-    { title: "Total Businesses", value: stats?.totalBusinesses?.length ?? "—" },
-    { title: "Total Outlets", value: stats?.totalRestaurants?.length ?? "—" },
-    { title: "Pending Invoices", value: unpaidInvoices?.length ?? "—" },
-    { title: "Paid Invoices", value: paidInvoices?.length ?? "—" },
+    { onClickValue: "Customers", title: "Total Businesses", value: dateWise ? filteredBusinesses.length : stats?.totalBusinesses?.length || "—" },
+    { onClickValue: "Customers", title: "Total Outlets", value: dateWise ? filteredRestaurants.length : stats?.totalRestaurants?.length || "—" },
+    { onClickValue: "Invoice List", title: "Pending Invoices", value: unpaidInvoices?.length ?? "—" },
+    { onClickValue: "Invoice List", title: "Paid Invoices", value: paidInvoices?.length ?? "—" },
   ];
 
   function groupInvoicesByProforma(allInvoices: any[]) {
@@ -68,58 +71,48 @@ export default function Dashboard() {
   function applyDateFilter() {
     if (!fromDate && !toDate) return;
   
-    // Normalize bounds (start of fromDate, end of toDate) so "to" is inclusive
     const from = fromDate ? new Date(fromDate) : null;
-    if (from) { from.setHours(0,0,0,0); }
+    if (from) from.setHours(0, 0, 0, 0);
+  
     const to = toDate ? new Date(toDate) : null;
-    if (to) { to.setHours(23,59,59,999); }
-
+    if (to) to.setHours(23, 59, 59, 999);
+  
+    // ---------- INVOICES ----------
     const filteredInvoices = stats?.invoices?.filter((inv: any) => {
       const createdAt = new Date(inv.createdAt);
-      if (from && to) {
-        return createdAt >= from && createdAt <= to;
-      } else if (from) {
-        return createdAt >= from;
-      } else if (to) {
-        return createdAt <= to;
-      }
+      if (from && to) return createdAt >= from && createdAt <= to;
+      if (from) return createdAt >= from;
+      if (to) return createdAt <= to;
       return true;
     }) ?? [];
+  
     const groupedInvoices = groupInvoicesByProforma(filteredInvoices);
-    const paid = paidInvs(groupedInvoices);
-    const unpaid = unpaidInvs(groupedInvoices);
-    if (paid) setPaidInvoices(paid);
-    if (unpaid) setUnpaidInvoices(unpaid);
-
-    // Let's do the same for businesses and restaurants
-    const filteredBusinesses = stats?.totalBusinesses?.filter((biz: any) => {
+    setPaidInvoices(paidInvs(groupedInvoices));
+    setUnpaidInvoices(unpaidInvs(groupedInvoices));
+  
+    // ---------- BUSINESSES ----------
+    const businesses = stats?.totalBusinesses?.filter((biz: any) => {
       const createdAt = new Date(biz.createdAt);
-      if (from && to) {
-        return createdAt >= from && createdAt <= to;
-      } else if (from) {
-        return createdAt >= from;
-      } else if (to) {
-        return createdAt <= to;
-      }
+      if (from && to) return createdAt >= from && createdAt <= to;
+      if (from) return createdAt >= from;
+      if (to) return createdAt <= to;
       return true;
     }) ?? [];
-    const filteredRestaurants = stats?.totalRestaurants?.filter((rest: any) => {
+  
+    setFilteredBusinesses(businesses);
+  
+    // ---------- RESTAURANTS ----------
+    const restaurants = stats?.totalRestaurants?.filter((rest: any) => {
       const createdAt = new Date(rest.createdAt);
-      if (from && to) {
-        return createdAt >= from && createdAt <= to;
-      } else if (from) {
-        return createdAt >= from;
-      } else if (to) {
-        return createdAt <= to;
-      }
+      if (from && to) return createdAt >= from && createdAt <= to;
+      if (from) return createdAt >= from;
+      if (to) return createdAt <= to;
       return true;
     }) ?? [];
-    setStats({
-      ...stats,
-      totalBusinesses: filteredBusinesses,
-      totalRestaurants: filteredRestaurants,
-    });
-  };
+  
+    setFilteredRestaurants(restaurants);
+    setDateWise(true);
+  }
 
   useEffect(() => {
     const URL = process.env.NEXT_PUBLIC_API_URL;
@@ -218,7 +211,8 @@ export default function Dashboard() {
                 {statsTop.map((s) => (
                   <div
                     key={s.title}
-                    className="bg-white border rounded-lg p-5 shadow-md hover:shadow-lg transition flex flex-col justify-between"
+                    onClick={() => setDisplay(s.onClickValue)}
+                    className="bg-white border rounded-lg p-5 shadow-md hover:shadow-lg transition flex flex-col justify-between cursor-pointer"
                   >
                     <div className="text-sm font-medium text-gray-500">{s.title}</div>
                     <div className="mt-3 text-3xl font-bold text-gray-800">{s.value}</div>
@@ -227,9 +221,9 @@ export default function Dashboard() {
               </section>
 
               {/* THREE-COLUMN BLOCK */}
-              <section className="grid grid-cols-1 gap-4">
+              <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-                {/* <div className="bg-white border rounded-lg p-6 shadow-md hover:shadow-lg transition">
+                <div className="bg-white border rounded-lg p-6 shadow-md hover:shadow-lg transition">
                   <div className="text-sm text-gray-500 font-medium">MRR</div>
                   <div className="mt-4 text-4xl font-bold text-gray-800">
                     {}
@@ -243,7 +237,7 @@ export default function Dashboard() {
                     {}
                   </div>
                   <div className="mt-2 text-xs text-gray-500">Annual recurring revenue</div>
-                </div> */}
+                </div>
 
                 <div className="bg-white border rounded-lg p-6 shadow-md hover:shadow-lg transition">
                   <div className="text-sm text-gray-500 font-medium">Overview</div>

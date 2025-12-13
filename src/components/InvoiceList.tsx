@@ -24,6 +24,7 @@ export default function InvoiceList() {
 
   useEffect(() => {
     axios.get(`${API}/invoices`).then((res: any) => {
+      console.log("Invoices:", res.data);
       const paid = res.data?.filter((inv: any) => inv.status === "paid" || inv.status === "partially paid");
       const unpaid = res.data?.filter((inv: any) => inv.status === "pending");
       if (res.data) setAllInvoices(res.data);

@@ -67,9 +67,11 @@ function numberToWords(num: number): string {
 
 interface PricingPlan {
   createdAt: string;
+  planType: "fixed" | "metered" | "hybrid";
   validity: number;
   basePrice: number;
   planName: string;
+  customDuration: number;
 }
 
 interface Invoice {
@@ -84,6 +86,7 @@ interface Invoice {
   paymentDate: string | null;
   createdAt: string;
   pricingPlanId: number;
+  discountAmount?: number;
 }
 
 interface RestaurantBrand {
@@ -98,6 +101,8 @@ interface Restaurant {
   name: string;
   invoices: Invoice[];
   restaurantPricingPlans: { 
+    createdAt: string;
+    customDuration: number,
     pricingPlan: PricingPlan,
     cgst: boolean,
     igst: boolean,
@@ -143,6 +148,7 @@ export default function SpecificInvoice() {
   ;
 
   const pricingPlan = restaurant.restaurantPricingPlans[0]?.pricingPlan || null;
+  const restaurantPricingPlan = restaurant.restaurantPricingPlans[0] || null;
 
   const specificInv = restaurant.invoices.find(
     (inv) => inv.id === specificInvId
@@ -160,7 +166,20 @@ export default function SpecificInvoice() {
 
   const createdDate = new Date(pricingPlan.createdAt);
   const endDate = new Date(createdDate);
-  endDate.setMonth(endDate.getMonth() + pricingPlan.validity - 1);
+  
+  if (pricingPlan.planType === "fixed") {
+    if (restaurantPricingPlan?.customDuration && restaurantPricingPlan.customDuration > 0) {
+      endDate.setMonth(endDate.getMonth() + restaurantPricingPlan.customDuration - 1);
+    } else {
+      endDate.setMonth(endDate.getMonth() + pricingPlan.validity - 1);
+    }
+  } else {
+    if (restaurantPricingPlan?.customDuration && restaurantPricingPlan.customDuration > 0) {
+      endDate.setMonth(endDate.getMonth() + restaurantPricingPlan.customDuration - 1);
+    } else {
+      endDate.setMonth(endDate.getMonth() + pricingPlan.validity - 1);
+    }
+  }
 
   const formatDate = (date: Date) =>
     date.toLocaleDateString("en-GB", {
@@ -279,7 +298,7 @@ export default function SpecificInvoice() {
             <td className="border p-2">Possier Point of Sale</td>
             <td className="border p-2 whitespace-pre-line">
               {restaurant.name}{"\n"}
-              {pricingPlan.validity} month(s) Subscription{"\n"}
+              {restaurantPricingPlan.customDuration || pricingPlan.customDuration} month(s) Subscription{"\n"}
               Subscription period:{"\n"}
               {subscriptionPeriod}
             </td>
@@ -314,6 +333,17 @@ export default function SpecificInvoice() {
               <td className="border p-2 text-center">{Number(subTotalAmount * 0.18)}.00/-</td>
             </tr>
           )}
+
+          {invoice.discountAmount && (invoice.discountAmount > 0) ? (
+            <tr className="bg-yellow-50">
+              <td colSpan={3} className="border p-2 text-right text-yellow-800">
+                Discount Applied
+              </td>
+              <td className="border p-2 text-center text-yellow-800">
+                -{invoice.discountAmount}.00/-
+              </td>
+            </tr>
+          ) : null}
 
           <tr className="font-bold">
             <td colSpan={3} className="border p-2 text-right">

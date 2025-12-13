@@ -253,8 +253,7 @@ export default function Customers() {
   useEffect(() => {
     axios.get(`${API}/restaurant`).then((res) => {
       setRestaurants(res.data);
-      // const paid = res.data?.filter((res: any) => res.invoices.length > 0 &&  res.invoices.at(-1).status === "paid");
-      const paid = res.data?.filter((res: any) => res.invoices?.length > 0 && res.invoices?.filter((inv: any) => inv === "paid"));
+      const paid = res.data?.filter((res: any) => res.invoices.length > 0 &&  res.invoices.at(-1).status === "paid");
       const unpaid = res.data?.filter((res: any) => 
         res.invoices.length > 0 &&  res.invoices.at(-1).status === "pending" ||
         res.invoices.length > 0 &&  res.invoices.at(-1).status === "partially paid"
