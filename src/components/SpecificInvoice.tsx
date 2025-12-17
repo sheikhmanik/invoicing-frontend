@@ -68,6 +68,7 @@ function numberToWords(num: number): string {
 interface PricingPlan {
   createdAt: string;
   planType: "fixed" | "metered" | "hybrid";
+  billingCycle: number;
   validity: number;
   basePrice: number;
   planName: string;
@@ -298,7 +299,10 @@ export default function SpecificInvoice() {
             <td className="border p-2">Possier Point of Sale</td>
             <td className="border p-2 whitespace-pre-line">
               {restaurant.name}{"\n"}
-              {restaurantPricingPlan.customDuration || pricingPlan.customDuration} month(s) Subscription{"\n"}
+              {
+                restaurantPricingPlan.customDuration ||
+                (pricingPlan.planType === "fixed" ? pricingPlan.billingCycle : pricingPlan.validity)
+              } month(s) Subscription{"\n"}
               Subscription period:{"\n"}
               {subscriptionPeriod}
             </td>

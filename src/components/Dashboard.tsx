@@ -34,6 +34,10 @@ export default function Dashboard() {
   const [filteredBusinesses, setFilteredBusinesses] = useState<any[]>([]);
   const [filteredRestaurants, setFilteredRestaurants] = useState<any[]>([]);
   const [dateWise, setDateWise] = useState<boolean>(false);
+  const [restaurantPricingPlans, setRestaurantPricingPlans] = useState<any[]>([]);
+  const [filteredResPricingPlans, setFilteredResPricingPlans] = useState<any[]>([]);
+  const [MRR, setMRR] = useState<number>();
+  const [ARR, setARR] = useState<number>();
 
   const statsTop = [
     { onClickValue: "Customers", title: "Total Businesses", value: dateWise ? filteredBusinesses.length : stats?.totalBusinesses?.length || "—" },
@@ -111,10 +115,20 @@ export default function Dashboard() {
       if (to) return createdAt <= to;
       return true;
     }) ?? [];
+
+    // ---------- RestaurantPricingPlans ----------
+    const filteredPlans = restaurantPricingPlans.filter((plan: any) => {
+      const createdAt = new Date(plan.createdAt);
+      if (from && to) return createdAt >= from && createdAt <= to;
+      if (from) return createdAt >= from;
+      if (to) return createdAt <= to;
+      return true;
+    }) ?? [];
   
     setFilteredRestaurants(restaurants);
+    setFilteredResPricingPlans(filteredPlans);
     setDateWise(true);
-  }
+  };
 
   useEffect(() => {
     axios.get(`${API}/dashboard/stats`).then(res => {
@@ -126,6 +140,51 @@ export default function Dashboard() {
       if (unpaid) setUnpaidInvoices(unpaid);
     });
   }, []);
+
+  useEffect(() => {
+    axios.get(`${API}/restaurant/restaurantPricingPlans`).then(res => {
+      setRestaurantPricingPlans(res.data);
+      setFilteredResPricingPlans(res.data);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!Array.isArray(filteredResPricingPlans)) return;
+  
+    let mrr = 0;
+
+    filteredResPricingPlans.forEach((plan: any) => {
+      let price = 0;
+      let duration = 0;
+
+      // price
+      if (plan.pricingPlan?.type === "fixed") {
+        price = Number(plan.pricingPlan.fixedPrice);
+      } else {
+        price = Number(plan.pricingPlan.basePrice);
+      }
+
+      // duration
+      if (plan.customDuration) {
+        duration = Number(plan.customDuration);
+      } else {
+        duration =
+          plan.pricingPlan?.type === "fixed"
+            ? Number(plan.pricingPlan.billingCycle)
+            : Number(plan.pricingPlan.validity);
+      }
+
+      if (!price || !duration) return;
+
+      // monthly normalization
+      mrr += price / duration;
+    });
+
+    const arr = mrr * 12;
+
+    setMRR(Number(mrr.toFixed(2)));
+    setARR(Number(arr.toFixed(2)));
+  }, [filteredResPricingPlans]);
 
   useEffect(() => {
     axios.post(`${API}/auto-generate`).then(res => {
@@ -232,17 +291,13 @@ export default function Dashboard() {
 
                 <div className="bg-white border rounded-lg p-6 shadow-md hover:shadow-lg transition">
                   <div className="text-sm text-gray-500 font-medium">MRR</div>
-                  <div className="mt-4 text-4xl font-bold text-gray-800">
-                    {}
-                  </div>
+                  <div className="mt-4 text-4xl font-bold text-gray-800">{MRR}</div>
                   <div className="mt-2 text-xs text-gray-500">Monthly recurring revenue</div>
                 </div>
 
                 <div className="bg-white border rounded-lg p-6 shadow-md hover:shadow-lg transition">
                   <div className="text-sm text-gray-500 font-medium">ARR</div>
-                  <div className="mt-4 text-4xl font-bold text-gray-800">
-                    {}
-                  </div>
+                  <div className="mt-4 text-4xl font-bold text-gray-800">{ARR}</div>
                   <div className="mt-2 text-xs text-gray-500">Annual recurring revenue</div>
                 </div>
 
